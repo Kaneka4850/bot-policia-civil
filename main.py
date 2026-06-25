@@ -28,30 +28,30 @@ COGS = [
     "cogs.cursos",
 ]
 
-@bot.command(name="comandos")
-async def comandos(ctx):
+@bot.tree.command(name="comandos", description="Lista todos os comandos disponíveis")
+async def comandos(interaction: discord.Interaction):
     embed = discord.Embed()
     embed.title = "📝 Lista de Comandos Disponiveis"
-    embed.description = "Esses são os comandos do bot, não esqueça de usar o prefixo `!` antes de cada comando."
+    embed.description = "Esses são os comandos do bot, eles agora funcionam usando `/` (slash commands)."
     embed.color = discord.Color.blue()
-    embed.add_field(name="!setup_provas",            value="(Apenas Arima pode usar esse comando)", inline=False)
-    embed.add_field(name="!setup_registro",          value="(Apenas Arima pode usar esse comando).", inline=False)
-    embed.add_field(name="!painel_acao",             value="(Apenas Administradores) Cria o painel de registro de ações.", inline=False)
-    embed.add_field(name="!listar_registros",        value="Lista todos os registros aprovados.", inline=False)
-    embed.add_field(name="!setup_ausencia",          value="Comando para criar o menu de ausência (apenas administradores).", inline=False)
-    embed.add_field(name="!setup_cursos",            value="Comando para criar o menu de cursos (apenas administradores).", inline=False)
-    embed.add_field(name="!demitir",                 value="Demitir um agente (apenas admins).", inline=False)
-    embed.add_field(name="!convocar",                value="Convoca um membro para uma reunião.", inline=False)
-    embed.add_field(name="!advertir",                value="Aplica uma advertência a um membro.", inline=False)
-    embed.add_field(name="!prisao",                  value="Registra uma prisão.", inline=False)
-    embed.add_field(name="!status_acao",             value="Exibe estatísticas globais de ações por tipo.", inline=False)
-    embed.add_field(name="!status_membro [@usuário]",value="Ranking top-15 ou ficha individual de um membro.", inline=False)
-    embed.add_field(name="!setup_status",            value="(Apenas Administradores) Posta o embed global de estatísticas no canal atual.", inline=False)
-    embed.add_field(name="!sync_acoes [N]",          value="(Apenas Administradores) Importa histórico retroativo de ações (padrão: 200 mensagens).", inline=False)
-    embed.add_field(name="!comandos",                value="Lista todos os comandos disponíveis.", inline=False)
+    embed.add_field(name="/setup_provas",            value="(Apenas Arima pode usar esse comando)", inline=False)
+    embed.add_field(name="/setup_registro",          value="(Apenas Arima pode usar esse comando).", inline=False)
+    embed.add_field(name="/painel_acao",             value="(Apenas Administradores) Cria o painel de registro de ações.", inline=False)
+    embed.add_field(name="/listar_registros",        value="Lista todos os registros aprovados.", inline=False)
+    embed.add_field(name="/setup_ausencia",          value="Comando para criar o menu de ausência (apenas administradores).", inline=False)
+    embed.add_field(name="/setup_cursos",            value="Comando para criar o menu de cursos (apenas administradores).", inline=False)
+    embed.add_field(name="/demitir",                 value="Demitir um agente (apenas admins).", inline=False)
+    embed.add_field(name="/convocar",                value="Convoca um membro para uma reunião.", inline=False)
+    embed.add_field(name="/advertir",                value="Aplica uma advertência a um membro.", inline=False)
+    embed.add_field(name="/prisao",                  value="Registra uma prisão.", inline=False)
+    embed.add_field(name="/status_acao",             value="Exibe estatísticas globais de ações por tipo.", inline=False)
+    embed.add_field(name="/status_membro [@usuário]",value="Ranking top-15 ou ficha individual de um membro.", inline=False)
+    embed.add_field(name="/setup_status",            value="(Apenas Administradores) Posta o embed global de estatísticas no canal atual.", inline=False)
+    embed.add_field(name="/sync_acoes [N]",          value="(Apenas Administradores) Importa histórico retroativo de ações (padrão: 200 mensagens).", inline=False)
+    embed.add_field(name="/comandos",                value="Lista todos os comandos disponíveis.", inline=False)
     embed.set_footer(text="Use os comandos apenas em caso de necessidade, não abuse do bot.")
     embed.set_thumbnail(url=bot.user.display_avatar.url)
-    await ctx.send(embed=embed)
+    await interaction.response.send_message(embed=embed)
 
 async def load_cogs():
     for cog in COGS:

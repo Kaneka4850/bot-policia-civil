@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands
+from discord import app_commands
 import asyncio
 import io
 import aiohttp
@@ -113,9 +114,9 @@ class RegistroPrisao(commands.Cog):
     # ------------------------------------------
     # Comando de setup (somente admin)
     # ------------------------------------------
-    @commands.command()
-    @commands.has_permissions(administrator=True)
-    async def setup_prisao(self, ctx: commands.Context):
+    @app_commands.command(name="setup_prisao", description="Cria o embed com o botão persistente de registro de prisão.")
+    @app_commands.default_permissions(administrator=True)
+    async def setup_prisao(self, interaction: discord.Interaction):
         """Cria o embed com o botão persistente de registro de prisão."""
         embed = discord.Embed(
             title="🚔 Sistema de Registro de Prisões",
@@ -125,8 +126,8 @@ class RegistroPrisao(commands.Cog):
             ),
             color=discord.Color.dark_blue(),
         )
-        await ctx.send(embed=embed, view=PrisaoView(self.bot))
-        await ctx.message.delete()
+        await interaction.channel.send(embed=embed, view=PrisaoView(self.bot))
+        await interaction.response.send_message("Painel de registro de prisão enviado com sucesso!", ephemeral=True)
 
     # ------------------------------------------
     # Helpers internos

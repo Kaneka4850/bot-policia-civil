@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands
+from discord import app_commands
 from datetime import datetime, timezone
 
 # ──────────────────────────────────────────────
@@ -231,9 +232,9 @@ class Advertencias(commands.Cog):
         """Registra a view persistente no bot ao carregar a cog."""
         self.bot.add_view(AdvertenciaView())
 
-    @commands.command(name="setup_advertencia")
-    @commands.has_permissions(administrator=True)
-    async def setup_advertencia(self, ctx: commands.Context):
+    @app_commands.command(name="setup_advertencia", description="Envia o embed persistente de advertência no canal atual.")
+    @app_commands.default_permissions(administrator=True)
+    async def setup_advertencia(self, interaction: discord.Interaction):
         """
         Envia o embed persistente de advertência no canal atual.
         Apenas administradores podem executar esse comando.
@@ -252,12 +253,8 @@ class Advertencias(commands.Cog):
         )
         embed.set_footer(text="Apenas oficiais autorizados podem aplicar advertências.")
 
-        await ctx.send(embed=embed, view=AdvertenciaView())
-
-    @setup_advertencia.error
-    async def setup_error(self, ctx: commands.Context, error):
-        if isinstance(error, commands.MissingPermissions):
-            await ctx.send("⛔ Apenas administradores podem executar esse comando.", ephemeral=True)
+        await interaction.channel.send(embed=embed, view=AdvertenciaView())
+        await interaction.response.send_message("Painel de advertência enviado com sucesso!", ephemeral=True)
 
 
 # ──────────────────────────────────────────────

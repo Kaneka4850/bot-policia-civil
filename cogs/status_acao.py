@@ -22,6 +22,7 @@ from typing import Optional
 
 import discord
 from discord.ext import commands
+from discord import app_commands
 
 # ──────────────────────────────────────────────────────────
 # CONFIGURAÇÃO
@@ -453,108 +454,70 @@ class StatusAcaoCog(commands.Cog):
         self._status_message_id = msg.id
 
     # ------------------------------------------------------------------
-    # COMANDO: !status_acao
+    # COMANDO: /status_acao
     # ------------------------------------------------------------------
 
-    @commands.command(name="status_acao")
-    async def status_acao(self, ctx: commands.Context) -> None:
+    @app_commands.command(name="status_acao", description="Exibe estatísticas globais de ações por tipo.")
+    async def status_acao(self, interaction: discord.Interaction) -> None:
         """Exibe estatísticas globais de ações por tipo."""
         embed = _build_embed_global(self.bot)
-        await ctx.send(embed=embed)
-        try:
-            await ctx.message.delete()
-        except discord.Forbidden:
-            pass
+        await interaction.response.send_message(embed=embed)
 
     # ------------------------------------------------------------------
-    # COMANDO: !status_membro
+    # COMANDO: /status_membro
     # ------------------------------------------------------------------
 
-    @commands.command(name="status_membro")
+    @app_commands.command(name="status_membro", description="Ficha individual (com menção) ou top-15 (sem menção).")
     async def status_membro(
         self,
-        ctx: commands.Context,
+        interaction: discord.Interaction,
         membro: Optional[discord.Member] = None,
     ) -> None:
         """Sem menção → top-15 | Com menção → ficha individual."""
         embed = _build_embed_top15(self.bot) if membro is None else _build_embed_membro(self.bot, membro)
-        await ctx.send(embed=embed)
-        try:
-            await ctx.message.delete()
-        except discord.Forbidden:
-            pass
-
-    @status_membro.error
-    async def status_membro_error(
-        self, ctx: commands.Context, error: commands.CommandError
-    ) -> None:
-        if isinstance(error, commands.BadArgument):
-            await ctx.send(
-                "❌ Membro não encontrado. Use uma menção válida: `!status_membro @usuário`",
-                delete_after=8,
-            )
+        await interaction.response.send_message(embed=embed)
 
     # ------------------------------------------------------------------
-    # COMANDO ADMIN: !setup_status
+    # COMANDO ADMIN: /setup_status
     # ------------------------------------------------------------------
 
-    @commands.command(name="setup_status")
-    @commands.has_permissions(administrator=True)
-    async def setup_status(self, ctx: commands.Context) -> None:
+    @app_commands.command(name="setup_status", description="Posta o embed global no canal atual.")
+    @app_commands.default_permissions(administrator=True)
+    async def setup_status(self, interaction: discord.Interaction) -> None:
         """Posta o embed global no canal atual e salva o ID para atualizações futuras."""
         global CANAL_STATUS_ID
-        CANAL_STATUS_ID = ctx.channel.id
+        CANAL_STATUS_ID = interaction.channel.id
 
         embed = _build_embed_global(self.bot)
-        msg = await ctx.send(embed=embed)
+        msg = await interaction.channel.send(embed=embed)
         self._status_message_id = msg.id
-        await ctx.message.delete()
-
-    @setup_status.error
-    async def setup_status_error(
-        self, ctx: commands.Context, error: commands.CommandError
-    ) -> None:
-        if isinstance(error, commands.MissingPermissions):
-            await ctx.send(
-                "❌ Você precisa de permissão de **Administrador** para usar este comando.",
-                delete_after=8,
-            )
+        await interaction.response.send_message("Painel de status configurado com sucesso!", ephemeral=True)
 
     # ------------------------------------------------------------------
-    # COMANDO ADMIN: !sync_acoes
+    # COMANDO ADMIN: /sync_acoes
     # ------------------------------------------------------------------
 
-    @commands.command(name="sync_acoes")
-    @commands.has_permissions(administrator=True)
+    @app_commands.command(name="sync_acoes", description="Varre as últimas N mensagens do canal e importa ações.")
+    @app_commands.default_permissions(administrator=True)
     async def sync_acoes(
         self,
-        ctx: commands.Context,
+        interaction: discord.Interaction,
         limite: int = 200,
     ) -> None:
         """Varre as últimas N mensagens do canal e importa ações ainda não registradas."""
-        msg_status = await ctx.send(f"⏳ Sincronizando últimas {limite} mensagens...")
+        await interaction.response.send_message(f"⏳ Sincronizando últimas {limite} mensagens...")
 
         total_novos = 0
-        async for message in ctx.channel.history(limit=limite):
+        async for message in interaction.channel.history(limit=limite):
             if message.author != self.bot.user:
                 continue
             if self._sincronizar_embed(message):
                 total_novos += 1
 
-        await msg_status.edit(
+        await interaction.edit_original_response(
             content=f"✅ Sincronização concluída. {total_novos} ação(ões) nova(s) importada(s)."
         )
         await self._atualizar_embed_global()
-
-    @sync_acoes.error
-    async def sync_acoes_error(
-        self, ctx: commands.Context, error: commands.CommandError
-    ) -> None:
-        if isinstance(error, commands.MissingPermissions):
-            await ctx.send(
-                "❌ Você precisa de permissão de **Administrador** para usar este comando.",
-                delete_after=8,
-            )
 
 
 # ──────────────────────────────────────────────────────────

@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands
+from discord import app_commands
 from discord import ui
 import re
 
@@ -332,11 +333,11 @@ class SetupCursos(commands.Cog):
     async def cog_load(self):
         self.bot.add_view(SetupCursosView())
 
-    @commands.command(name="setup_cursos")
-    @commands.has_permissions(administrator=True)
-    async def setup_cursos(self, ctx: commands.Context):
+    @app_commands.command(name="setup_cursos", description="Posta o embed persistente de agendamento de cursos.")
+    @app_commands.default_permissions(administrator=True)
+    async def setup_cursos(self, interaction: discord.Interaction):
         """Posta o embed persistente de agendamento de cursos."""
-        bot_user   = ctx.bot.user
+        bot_user   = interaction.client.user
         bot_avatar = bot_user.display_avatar.url if bot_user else None
 
         embed = discord.Embed(
@@ -352,20 +353,8 @@ class SetupCursos(commands.Cog):
             embed.set_author(name=bot_user.display_name, icon_url=bot_avatar)
         embed.set_footer(text="Apenas instrutores e administradores podem agendar cursos.")
 
-        await ctx.send(embed=embed, view=SetupCursosView())
-
-        try:
-            await ctx.message.delete()
-        except discord.Forbidden:
-            pass
-
-    @setup_cursos.error
-    async def setup_cursos_error(self, ctx: commands.Context, error):
-        if isinstance(error, commands.MissingPermissions):
-            await ctx.send(
-                "❌ Você precisa ser **Administrador** para usar esse comando.",
-                delete_after=8,
-            )
+        await interaction.channel.send(embed=embed, view=SetupCursosView())
+        await interaction.response.send_message("Painel de cursos enviado com sucesso!", ephemeral=True)
 
 
 async def setup(bot: commands.Bot):

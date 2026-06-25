@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands
+from discord import app_commands
 from datetime import datetime
 
 # --- CONFIGURAÇÕES ---
@@ -104,20 +105,18 @@ class AbsenceCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @commands.Cog.listener()
-    async def on_ready(self):
+    async def cog_load(self):
         """
-        Registra a View no Bot para que ela responda mesmo após o Bot reiniciar.
+        Registra a View no Bot ao carregar a cog para que ela responda mesmo após o Bot reiniciar.
         """
         self.bot.add_view(AbsencePersistentView())
         print(f"[{self.__class__.__name__}] View persistente carregada.")
 
-    @commands.command(name="setup_ausencia")
-    @commands.has_permissions(administrator=True)
-    async def setup_ausencia(self, ctx: commands.Context):
+    @app_commands.command(name="setup_ausencia", description="Envia a mensagem principal com o botão de ausência.")
+    @app_commands.default_permissions(administrator=True)
+    async def setup_ausencia(self, interaction: discord.Interaction):
         """
         Envia a mensagem principal com o botão de ausência.
-        Uso: !setup_ausencia
         """
         embed = discord.Embed(
             title="✈️ Registro de Ausência",
@@ -131,19 +130,8 @@ class AbsenceCog(commands.Cog):
             color=discord.Color.dark_orange()
         )
         
-        await ctx.send(embed=embed, view=AbsencePersistentView())
-        
-        # Opcional: Deletar a mensagem do comando !setup_ausencia para limpar o chat
-        try:
-            await ctx.message.delete()
-        except:
-            pass
-
-    @setup_ausencia.error
-    async def setup_error(self, ctx, error):
-        """Tratamento de erro para falta de permissão."""
-        if isinstance(error, commands.MissingPermissions):
-            await ctx.send("❌ Você não tem permissão para configurar este menu.", delete_after=10)
+        await interaction.channel.send(embed=embed, view=AbsencePersistentView())
+        await interaction.response.send_message("Painel de ausência enviado com sucesso!", ephemeral=True)
 
 
 async def setup(bot: commands.Bot):

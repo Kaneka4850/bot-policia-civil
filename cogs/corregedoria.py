@@ -12,6 +12,7 @@ Funcionalidades:
 
 import discord
 from discord.ext import commands
+from discord import app_commands
 import datetime
 
 # ─────────────────────────────────────────────
@@ -495,20 +496,21 @@ class Corregedoria(commands.Cog):
         self.bot.add_view(TicketView(self.bot, autor=None))  # autor=None pois é reconstruída por interação
 
     # ── Comando legado ──
-    @commands.command(name="corregedoria")
-    async def corregedoria_cmd(self, ctx):
+    @app_commands.command(name="corregedoria", description="Envia o embed de abertura de ticket no modo legado.")
+    async def corregedoria_cmd(self, interaction: discord.Interaction):
         """Envia o embed de abertura de ticket no modo legado."""
         embed = discord.Embed(
             title="🚨 Abrir Ticket de Corregedoria",
             description="Selecione abaixo o tipo de ocorrência a ser registrada.",
             color=discord.Color.red()
         )
-        await ctx.send(embed=embed, view=CategoriaView(self.bot))
+        await interaction.channel.send(embed=embed, view=CategoriaView(self.bot))
+        await interaction.response.send_message("Menu de corregedoria enviado!", ephemeral=True)
 
     # ── Comando de setup ──
-    @commands.command(name="setup_corregedoria")
-    @commands.has_permissions(administrator=True)
-    async def setup_corregedoria(self, ctx):
+    @app_commands.command(name="setup_corregedoria", description="Envia o embed persistente de abertura de tickets (novo sistema).")
+    @app_commands.default_permissions(administrator=True)
+    async def setup_corregedoria(self, interaction: discord.Interaction):
         """
         Envia o embed persistente de abertura de tickets (novo sistema).
         Requer permissão de administrador.
@@ -525,13 +527,8 @@ class Corregedoria(commands.Cog):
             color=discord.Color.dark_red()
         )
         embed.set_footer(text="Selecione uma categoria para iniciar")
-        await ctx.send(embed=embed, view=SetupView(self.bot))
-
-        # Remove a mensagem de comando para manter o canal limpo
-        try:
-            await ctx.message.delete()
-        except discord.Forbidden:
-            pass
+        await interaction.channel.send(embed=embed, view=SetupView(self.bot))
+        await interaction.response.send_message("Painel de corregedoria enviado com sucesso!", ephemeral=True)
 
 
 async def setup(bot):

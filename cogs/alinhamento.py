@@ -1,6 +1,7 @@
 import re
 import discord
 from discord.ext import commands
+from discord import app_commands
 
 # ─────────────────────────────────────────────
 # IDs centralizados
@@ -117,7 +118,7 @@ class AlinhamentoModal(discord.ui.Modal, title="📋 Convocar para Alinhamento")
             f"Caro {membro.mention}!\n\n"
             "Você foi convocado para o alinhamento para conversarmos sobre seus "
             "atos de conduta na policia.\n\n"
-            f"Compareça à call <#{1508540740257579080}> no horário avisado abaixo "
+            f"Compareça à call através do link {LINK_CALL} no horário avisado abaixo "
             "para que os pontos sejam alinhados."
         )
         embed_conv.add_field(
@@ -204,12 +205,12 @@ class Convocacao(commands.Cog):
         self.bot.add_view(AlinhamentoView(self.bot))
 
     # ── !setup_alinhamento ───────────────────────────────────────────
-    @commands.command(name="setup_alinhamento")
-    async def setup_alinhamento(self, ctx):
+    @app_commands.command(name="setup_alinhamento", description="Envia o embed persistente com o botão de convocação.")
+    async def setup_alinhamento(self, interaction: discord.Interaction):
         """Envia o embed persistente com o botão de convocação."""
-        possui_cargo = any(r.id == CARGO_PERMITIDO for r in ctx.author.roles)
+        possui_cargo = any(r.id == CARGO_PERMITIDO for r in interaction.user.roles)
         if not possui_cargo:
-            await ctx.send("⛔ Você não tem permissão para usar esse comando.")
+            await interaction.response.send_message("⛔ Você não tem permissão para usar esse comando.", ephemeral=True)
             return
 
         embed = discord.Embed(
@@ -222,7 +223,8 @@ class Convocacao(commands.Cog):
         )
         embed.set_footer(text="Policia Civil de Meta City")
 
-        await ctx.send(embed=embed, view=AlinhamentoView(self.bot))
+        await interaction.channel.send(embed=embed, view=AlinhamentoView(self.bot))
+        await interaction.response.send_message("Painel de alinhamento enviado com sucesso!", ephemeral=True)
 
 
 

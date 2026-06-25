@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands
+from discord import app_commands
 import re
 
 # 🧩 Serviços e utilitários
@@ -263,11 +264,9 @@ class Cadastro(commands.Cog):
         self.bot.add_view(AprovacaoView())
 
     # 🛠️ NOVO COMANDO: Cria a mensagem permanente de Registro (Print 2)
-    @commands.command()
-    async def setup_registro(self, ctx):
-        if not ctx.author.guild_permissions.administrator:
-            return await ctx.send("❌ Você não tem permissão para usar este comando.")
-
+    @app_commands.command(name="setup_registro", description="Cria a mensagem permanente de Registro")
+    @app_commands.default_permissions(administrator=True)
+    async def setup_registro(self, interaction: discord.Interaction):
         embed = discord.Embed(
             title="Cadastro para Policia Civil",
             description=(
@@ -278,19 +277,18 @@ class Cadastro(commands.Cog):
             color=discord.Color.dark_orange()
         )
         
-        await ctx.send(embed=embed, view=RegistroView(self.bot))
-        await ctx.message.delete() # Deleta o comando !setup_registro para manter o chat limpo
+        await interaction.channel.send(embed=embed, view=RegistroView(self.bot))
+        await interaction.response.send_message("Painel de registro enviado com sucesso!", ephemeral=True)
 
-    @commands.command(name='listar_registros')
-    async def listar_registros(self, ctx):
-        if not ctx.author.guild_permissions.administrator:
-            await ctx.send("❌ Você não tem permissão para usar este comando.")
-            return
-
+    @app_commands.command(name="listar_registros", description="Lista todos os registros aprovados")
+    @app_commands.default_permissions(administrator=True)
+    async def listar_registros(self, interaction: discord.Interaction):
         registros_aprovados = listar_registros_aprovados()
         if not registros_aprovados:
-            await ctx.send("📭 Nenhum registro aprovado encontrado.")
+            await interaction.response.send_message("📭 Nenhum registro aprovado encontrado.", ephemeral=True)
             return
+
+        await interaction.response.defer()
 
         for i in range(0, len(registros_aprovados), 5):
             bloco = registros_aprovados[i:i+5]
@@ -305,22 +303,19 @@ class Cadastro(commands.Cog):
                     value=f"**Nome:** {registro['nome']}\n**ID:** {registro['id']}\n**Telefone:** {registro['telefone']}",
                     inline=False
                 )
-            await ctx.send(embed=embed)
+            await interaction.followup.send(embed=embed)
 
-    @commands.command()
-    async def demitir(self, ctx):
-        if not ctx.author.guild_permissions.administrator:
-            await ctx.send("❌ Você não tem permissão para usar este comando.")
-            return
-
+    @app_commands.command(name="demitir", description="Demitir um oficial da polícia civil")
+    @app_commands.default_permissions(administrator=True)
+    async def demitir(self, interaction: discord.Interaction):
         view = discord.ui.View()
-        async def abrir_modal(interaction: discord.Interaction):
-            await interaction.response.send_modal(DemitirModal(self.bot))
+        async def abrir_modal(inter: discord.Interaction):
+            await inter.response.send_modal(DemitirModal(self.bot))
 
         botao = discord.ui.Button(label="Demitir", style=discord.ButtonStyle.danger)
         botao.callback = abrir_modal
         view.add_item(botao)
-        await ctx.send("Clique para exonerar o oficial da policia civil", view=view)
+        await interaction.response.send_message("Clique para exonerar o oficial da policia civil", view=view, ephemeral=True)
 
 
 async def setup(bot):

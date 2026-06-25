@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands
+from discord import app_commands
 
 # 🧩 Esta classe cuida apenas da INTERFACE (o botão e a criação dos canais)
 class ProvasView(discord.ui.View):
@@ -64,14 +65,11 @@ class Provas(commands.Cog):
     async def cog_load(self):
         self.bot.add_view(ProvasView())
 
-    # ✨ Alterado de !provas para !setup_provas, focado no uso da administração
-    @commands.command(name="setup_provas")
-    async def setup_provas(self, ctx):
+    # ✨ Alterado para slash command, focado no uso da administração
+    @app_commands.command(name="setup_provas", description="Envia o painel permanente de criação de provas")
+    @app_commands.default_permissions(administrator=True)
+    async def setup_provas(self, interaction: discord.Interaction):
         """Envia o painel permanente de criação de provas"""
-        
-        # Verifica se o usuário é administrador para não deixar qualquer um criar o painel
-        if not ctx.author.guild_permissions.administrator:
-            return await ctx.send("❌ Você não tem permissão para usar este comando.")
             
         # 📝 Criação do Embed com estética semelhante aos prints enviados
         embed = discord.Embed(
@@ -86,13 +84,8 @@ class Provas(commands.Cog):
         )
         
         view = ProvasView()
-        await ctx.send(embed=embed, view=view)
-        
-        # Deleta a mensagem de comando para manter o canal limpo
-        try:
-            await ctx.message.delete()
-        except discord.Forbidden:
-            pass
+        await interaction.channel.send(embed=embed, view=view)
+        await interaction.response.send_message("Painel de provas enviado com sucesso!", ephemeral=True)
 
 
 # 🛠️ Setup da extensão

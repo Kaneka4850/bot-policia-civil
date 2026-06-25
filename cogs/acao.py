@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands
+from discord import app_commands
 import re
 
 # ──────────────────────────────────────────────
@@ -429,9 +430,9 @@ class AcaoCog(commands.Cog):
     # COMANDO: setup do painel
     # ------------------------------------------------------------------
 
-    @commands.command(name="painel_acao")
-    @commands.has_permissions(administrator=True)
-    async def setup_painel(self, ctx: commands.Context) -> None:
+    @app_commands.command(name="painel_acao", description="Envia o painel de registro de ações no canal atual.")
+    @app_commands.default_permissions(administrator=True)
+    async def setup_painel(self, interaction: discord.Interaction) -> None:
         """Envia o painel de registro de ações no canal atual."""
         embed = discord.Embed(
             title="🚓 Central de Registros de Ações",
@@ -445,18 +446,8 @@ class AcaoCog(commands.Cog):
             ),
             color=discord.Color.dark_gray(),
         )
-        await ctx.send(embed=embed, view=ViewAcao())
-        await ctx.message.delete()
-
-    @setup_painel.error
-    async def setup_painel_error(
-        self, ctx: commands.Context, error: commands.CommandError
-    ) -> None:
-        if isinstance(error, commands.MissingPermissions):
-            await ctx.send(
-                "❌ Você precisa de permissão de **Administrador** para usar este comando.",
-                delete_after=8,
-            )
+        await interaction.channel.send(embed=embed, view=ViewAcao())
+        await interaction.response.send_message("Painel de ação enviado com sucesso!", ephemeral=True)
 
 
 async def setup(bot: commands.Bot) -> None:

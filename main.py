@@ -13,7 +13,30 @@ intents.guilds = True
 
 logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(message)s')
 
-bot = commands.Bot(command_prefix="!", intents=intents)
+class MyBot(commands.Bot):
+    async def setup_hook(self):
+        await load_cogs()
+        # Sync global (pode demorar até 1h para propagar no Discord)
+        try:
+            synced = await self.tree.sync()
+            logging.info(f"✅ {len(synced)} slash commands sincronizados globalmente.")
+        except Exception as e:
+            logging.error(f"❌ Erro ao sincronizar comandos globalmente: {e}")
+
+    async def on_ready(self):
+        logging.info(f"🤖 Bot online como: {self.user}")
+        logging.info(f"📊 Servidores conectados: {[g.name for g in self.guilds]}")
+        print(f"Bot online como {self.user}")
+        # ── LIMPEZA ÚNICA: remove comandos guild-específicos duplicados ──
+        for guild in self.guilds:
+            try:
+                self.tree.clear_commands(guild=guild)
+                await self.tree.sync(guild=guild)
+                logging.info(f"🧹 Comandos guild-específicos removidos de: {guild.name}")
+            except Exception as e:
+                logging.error(f"❌ Erro ao limpar {guild.name}: {e}")
+
+bot = MyBot(command_prefix="!", intents=intents)
 
 COGS = [
     "cogs.cadastro",
@@ -23,7 +46,7 @@ COGS = [
     "cogs.registro_prisao",
     "cogs.provas",
     "cogs.acao",
-    "cogs.status_acao",  # deve vir após cogs.acao
+    "cogs.status_acao",  
     "cogs.ausencia",
     "cogs.cursos",
 ]
@@ -61,16 +84,7 @@ async def load_cogs():
         except Exception as e:
             logging.error(f"❌ Erro ao carregar {cog}: {e}")
 
-@bot.event
-async def on_ready():
-    logging.info(f"🤖 Bot online como: {bot.user}")
-    logging.info(f"📊 Servidores conectados: {[guild.name for guild in bot.guilds]}")
-    print(f"Bot online como {bot.user}")
 
-@bot.event
-async def setup_hook():
-    await load_cogs()
-    await bot.tree.sync()
 
 if __name__ == "__main__":
     logging.info("🚀 Iniciando o bot...")

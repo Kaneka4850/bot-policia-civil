@@ -13,12 +13,13 @@ from services.membro_service import (
 )
 from utils.logger import log_event
 from utils.permissao import is_admin
+import utils.ui as ui
 
 # 🔧 IDs e configuração
-Cargos_aprovadores = [] # Lista de cargos que podem recrutar
-Cargo_membro = # Cargo policia civil
-Canal_logs = # Cargos logs
-canal_aprovacao =# Canal de aprovação
+Cargos_aprovadores = [1519099990587473925] # Lista de cargos que podem recrutar
+Cargo_membro = 1519099990507520035 # Cargo FBI
+Canal_logs = 1519099991266955297 # Canal 🔑・registros
+canal_aprovacao = 1519099991266955298 # Canal 📁・aprovação-registro
 
 
 # 🔹 Função para enviar logs e embeds
@@ -39,7 +40,7 @@ class AprovacaoView(discord.ui.View):
     async def verificar_permissao(self, interaction: discord.Interaction):
         aprovador = interaction.user
         if not is_admin(aprovador) and not any(r.id in Cargos_aprovadores for r in aprovador.roles):
-            await interaction.response.send_message("❌ Sem permissão para interagir com este registro.", ephemeral=True)
+            await interaction.response.send_message(embed=ui.build_error_embed("Sem permissão para interagir com este registro."), ephemeral=True)
             return False
         return True
 
@@ -58,9 +59,9 @@ class AprovacaoView(discord.ui.View):
         registro = buscar_registro_por_discord_id(user_id)
         
         if not registro:
-            return await interaction.response.send_message("❌ Registro não encontrado no banco de dados. Talvez já tenha sido processado.", ephemeral=True)
+            return await interaction.response.send_message(embed=ui.build_error_embed("Registro não encontrado no banco de dados. Talvez já tenha sido processado."), ephemeral=True)
         if registro.get("aprovado", False):
-            return await interaction.response.send_message("⚠️ Este registro já foi aprovado.", ephemeral=True)
+            return await interaction.response.send_message(embed=ui.build_warn_embed("Este registro já foi aprovado."), ephemeral=True)
 
         aprovar_registro(user_id)
         log_event(str(interaction.user), "Aprovou registro", registro["usuario"])
@@ -72,7 +73,7 @@ class AprovacaoView(discord.ui.View):
             await membro.add_roles(cargo, reason="Registro aprovado")
             # ✨ Novo nickname com estética "ID | Nome"
             nome_limite = registro["nome"][:20]
-            novo_nick = f"{registro['id']} | {nome_limite}"
+            novo_nick = f"{registro['id']} • {nome_limite}"
             try:
                 await membro.edit(nick=novo_nick)
             except discord.Forbidden:
@@ -82,7 +83,7 @@ class AprovacaoView(discord.ui.View):
 
         # Atualiza a mensagem original para remover os botões
         embed_atualizado = interaction.message.embeds[0]
-        embed_atualizado.color = discord.Color.green()
+        embed_atualizado.color = ui.UI_COLOR_SUCCESS
         await interaction.response.edit_message(
             content=f"✅ Registro aprovado por {interaction.user.mention}.",
             embed=embed_atualizado,
@@ -92,7 +93,7 @@ class AprovacaoView(discord.ui.View):
         await interaction.channel.send(f"🎉 O membro <@{user_id}> foi aprovado por {interaction.user.mention}.")
 
         # 📝 Envia embed de aprovação para logs
-        embed_log = discord.Embed(
+        embed_log = ui.build_embed(
             title="✅ Registro Aprovado",
             description=(
                 f"👤 {registro['usuario']}\n"
@@ -101,7 +102,7 @@ class AprovacaoView(discord.ui.View):
                 f"📞 Telefone: {registro['telefone']}\n"
                 f"👮 Aprovado por: {interaction.user.mention}"
             ),
-            color=discord.Color.green()
+            color=ui.UI_COLOR_SUCCESS
         )
         await enviar_log(interaction.guild, embed=embed_log)
 
@@ -117,7 +118,7 @@ class AprovacaoView(discord.ui.View):
             log_event(str(interaction.user), "Recusou registro", registro["usuario"])
 
         embed_atualizado = interaction.message.embeds[0]
-        embed_atualizado.color = discord.Color.red()
+        embed_atualizado.color = ui.UI_COLOR_ERROR
         await interaction.response.edit_message(
             content=f"❌ Registro recusado por {interaction.user.mention}.",
             embed=embed_atualizado,
@@ -128,7 +129,7 @@ class AprovacaoView(discord.ui.View):
             membro = interaction.guild.get_member(user_id)
             if membro:
                 await membro.send(f"Seu registro foi reprovado por{interaction.user.name}.")
-        except:
+        except discord.Forbidden:
             pass # Ignora se a DM do usuário estiver fechada
 
 
@@ -145,10 +146,10 @@ class RegistroModal(discord.ui.Modal, title="Registre seus dados"):
     async def on_submit(self, interaction: discord.Interaction):
         telefone_fmt = self.telefone.value
         if not re.fullmatch(r"\d{3}(-\d{3})?", telefone_fmt):      
-            return await interaction.response.send_message("❌ Formato inválido! Use 000-000 ou 000.", ephemeral=True)
+            return await interaction.response.send_message(embed=ui.build_error_embed("Formato inválido! Use 000-000 ou 000."), ephemeral=True)
 
         if buscar_registro_por_discord_id(interaction.user.id):
-            return await interaction.response.send_message("⛔ Você já tem um registro em andamento/aprovado.", ephemeral=True)
+            return await interaction.response.send_message(embed=ui.build_error_embed("Você já tem um registro em andamento/aprovado."), ephemeral=True)
 
         registro = {
             "nome": self.nome.value,
@@ -161,18 +162,16 @@ class RegistroModal(discord.ui.Modal, title="Registre seus dados"):
         adicionar_registro(registro)
 
         # Confirmação efêmera para o usuário
-        embed_confirma = discord.Embed(
-            title="✅ Registro enviado com sucesso!",
-            description=f"{interaction.user.mention}, seus dados foram enviados para aprovação.",
-            color=discord.Color.green()
+        await interaction.response.send_message(
+            embed=ui.build_success_embed(f"{interaction.user.mention}, seus dados foram enviados para aprovação.", title="Registro enviado com sucesso!"), 
+            ephemeral=True
         )
-        await interaction.response.send_message(embed=embed_confirma, ephemeral=True)
 
         # ✨ Embed semelhante ao Print 1 (Aprovação)
-        embed_pendente = discord.Embed(
-            title="💠 Solicitação de Entrada na Civil",
-            description="**Novo membro solicitando entrada na civil!**\n",
-            color=discord.Color.gold()
+        embed_pendente = ui.build_embed(
+            title="💠 Solicitação de Entrada no FBI",
+            description="**Novo membro solicitando entrada no FBI!**\n",
+            color=ui.UI_COLOR_WARNING
         )
         embed_pendente.add_field(name="👤 Solicitante", value=f"{interaction.user.mention}\n`{interaction.user.name}`", inline=False)
         embed_pendente.add_field(name="📛 Nome Cadastrado", value=f"`{self.nome.value}`", inline=True)
@@ -183,7 +182,7 @@ class RegistroModal(discord.ui.Modal, title="Registre seus dados"):
             embed_pendente.set_thumbnail(url=interaction.user.display_avatar.url)
             
         # O truque de persistência: salvar o ID no rodapé para a AprovacaoView conseguir ler
-        embed_pendente.set_footer(text=f"ID do Usuário: {interaction.user.id}")
+        embed_pendente.set_footer(text=f"{ui.FOOTER_TEXT} • ID do Usuário: {interaction.user.id}")
 
         await interaction.guild.get_channel(canal_aprovacao).send(
             content="📥 **Registro pendente:**\n@everyone favor revisar.",
@@ -215,12 +214,12 @@ class DemitirModal(discord.ui.Modal, title="Digite o ID discord do membro"):
     async def on_submit(self, interaction: discord.Interaction):
         try:
             did = int(self.discord_id.value)
-        except:
-            return await interaction.response.send_message("❌ ID inválido.", ephemeral=True)
+        except ValueError:
+            return await interaction.response.send_message(embed=ui.build_error_embed("ID inválido."), ephemeral=True)
 
         usr = buscar_registro_por_discord_id(did)
         if not usr:
-            return await interaction.response.send_message(f"❌ Usuário com ID `{did}` não registrado.", ephemeral=True)
+            return await interaction.response.send_message(embed=ui.build_error_embed(f"Usuário com ID `{did}` não registrado."), ephemeral=True)
 
         async def confirma(inter: discord.Interaction):
             remover_registro(did)
@@ -231,9 +230,9 @@ class DemitirModal(discord.ui.Modal, title="Digite o ID discord do membro"):
             if membro and cargo:
                 await membro.remove_roles(cargo, reason="Demitido")
 
-            await inter.response.send_message(f"✅ {usr['usuario']} demitido.", ephemeral=True)
+            await inter.response.send_message(embed=ui.build_success_embed(f"{usr['usuario']} demitido."), ephemeral=True)
 
-            embed_demissao = discord.Embed(
+            embed_demissao = ui.build_embed(
                 title="❌ Registro Removido",
                 description=(
                     f"👤 {usr['usuario']}\n"
@@ -242,7 +241,7 @@ class DemitirModal(discord.ui.Modal, title="Digite o ID discord do membro"):
                     f"🆔 Discord ID: {did}\n"
                     f"👮 Removido por: {inter.user.mention}"
                 ),
-                color=discord.Color.red()
+                color=ui.UI_COLOR_ERROR
             )
             await enviar_log(inter.guild, embed=embed_demissao)
 
@@ -267,35 +266,35 @@ class Cadastro(commands.Cog):
     @app_commands.command(name="setup_registro", description="Cria a mensagem permanente de Registro")
     @app_commands.default_permissions(administrator=True)
     async def setup_registro(self, interaction: discord.Interaction):
-        embed = discord.Embed(
-            title="Cadastro para Policia Civil",
+        embed = ui.build_embed(
+            title="Cadastro para o FBI",
             description=(
-                "▶️ | Clique no botão abaixo para iniciar o registro na policia civil.\n\n"
-                "⚠️ | **OBSERVAÇÃO:** Este é o processo de registro para os membros da policia civil, em caso de erro, chamar o Arima.\n\n"
+                "▶️ | Clique no botão abaixo para iniciar o registro no FBI.\n\n"
+                "⚠️ | **OBSERVAÇÃO:** Este é o processo de registro para os membros do FBI, em caso de erro, chamar o Arima.\n\n"
                 "👮‍♂️ • Atenciosamente, Arima"
             ),
-            color=discord.Color.dark_orange()
+            color=ui.UI_COLOR_MAIN
         )
         
         await interaction.channel.send(embed=embed, view=RegistroView(self.bot))
-        await interaction.response.send_message("Painel de registro enviado com sucesso!", ephemeral=True)
+        await interaction.response.send_message(embed=ui.build_success_embed("Painel de registro enviado com sucesso!"), ephemeral=True)
 
     @app_commands.command(name="listar_registros", description="Lista todos os registros aprovados")
     @app_commands.default_permissions(administrator=True)
     async def listar_registros(self, interaction: discord.Interaction):
         registros_aprovados = listar_registros_aprovados()
         if not registros_aprovados:
-            await interaction.response.send_message("📭 Nenhum registro aprovado encontrado.", ephemeral=True)
+            await interaction.response.send_message(embed=ui.build_warn_embed("Nenhum registro aprovado encontrado."), ephemeral=True)
             return
 
         await interaction.response.defer()
 
         for i in range(0, len(registros_aprovados), 5):
             bloco = registros_aprovados[i:i+5]
-            embed = discord.Embed(
-                title="📋 Oficiais da policia civil",
-                description="Lista dos Agentes da policia civil cadastrados",
-                color=discord.Color.green()
+            embed = ui.build_embed(
+                title="📋 Oficiais do FBI",
+                description="Lista dos Agentes do FBI cadastrados",
+                color=ui.UI_COLOR_MAIN
             )
             for idx, registro in enumerate(bloco, start=i+1):
                 embed.add_field(
@@ -305,7 +304,7 @@ class Cadastro(commands.Cog):
                 )
             await interaction.followup.send(embed=embed)
 
-    @app_commands.command(name="demitir", description="Demitir um oficial da polícia civil")
+    @app_commands.command(name="demitir", description="Demitir um oficial do FBI")
     @app_commands.default_permissions(administrator=True)
     async def demitir(self, interaction: discord.Interaction):
         view = discord.ui.View()
@@ -315,7 +314,7 @@ class Cadastro(commands.Cog):
         botao = discord.ui.Button(label="Demitir", style=discord.ButtonStyle.danger)
         botao.callback = abrir_modal
         view.add_item(botao)
-        await interaction.response.send_message("Clique para exonerar o oficial da policia civil", view=view, ephemeral=True)
+        await interaction.response.send_message("Clique para exonerar o oficial do FBI", view=view, ephemeral=True)
 
 
 async def setup(bot):

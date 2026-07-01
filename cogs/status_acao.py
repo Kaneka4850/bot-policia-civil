@@ -24,6 +24,8 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 
+import utils.ui as ui
+
 # ──────────────────────────────────────────────────────────
 # CONFIGURAÇÃO
 # ──────────────────────────────────────────────────────────
@@ -208,14 +210,14 @@ def _build_embed_global(bot: commands.Bot) -> discord.Embed:
     total_geral = total_win + total_loss
     winrate     = round((total_win / total_geral) * 100) if total_geral else 0
 
-    embed = discord.Embed(
+    embed = ui.build_embed(
         title="📊 Estatísticas Gerais de Ações",
         description=(
             f"**Total de ações:** {total_geral}\n"
             f"**Vitórias:** {total_win} • **Taxa:** {winrate}%\n"
             f"**Derrotas:** {total_loss} • **Taxa:** {100 - winrate}%"
         ),
-        color=discord.Color.dark_blue(),
+        color=ui.UI_COLOR_MAIN,
     )
 
     if bot.user and bot.user.display_avatar:
@@ -226,8 +228,8 @@ def _build_embed_global(bot: commands.Bot) -> discord.Embed:
     for acao in ACOES_CANONICAS:
         stats = acoes.get(acao, {"win": 0, "loss": 0})
         w = stats["win"]
-        l = stats["loss"]
-        total = w + l
+        derrotas = stats["loss"]
+        total = w + derrotas
         if total == 0:
             continue
         wr = round((w / total) * 100)
@@ -244,7 +246,7 @@ def _build_embed_global(bot: commands.Bot) -> discord.Embed:
             inline=False,
         )
 
-    embed.set_footer(text="Atualizado em tempo real • Polícia MetaCity")
+    # O rodapé padrão já é incluído por ui.build_embed
     return embed
 
 
@@ -263,10 +265,10 @@ def _build_embed_top15(bot: commands.Bot) -> discord.Embed:
             LIMIT 15
         """).fetchall()
 
-    embed = discord.Embed(
+    embed = ui.build_embed(
         title="🏆 Ranking de Ações",
         description="Top **15** membro(s) com mais ações finalizadas registradas.",
-        color=discord.Color.gold(),
+        color=ui.UI_COLOR_WARNING,
     )
 
     if bot.user and bot.user.display_avatar:
@@ -295,7 +297,7 @@ def _build_embed_top15(bot: commands.Bot) -> discord.Embed:
             inline=False,
         )
 
-    embed.set_footer(text="Polícia MetaCity • !status_membro @usuário para ficha individual")
+    embed.set_footer(text=f"{ui.FOOTER_TEXT} • !status_membro @usuário para ficha")
     return embed
 
 
@@ -331,10 +333,10 @@ def _build_embed_membro(bot: commands.Bot, member: discord.Member) -> discord.Em
     losses = losses or 0
     wr     = round((wins / total) * 100) if total else 0
 
-    embed = discord.Embed(
+    embed = ui.build_embed(
         title="📋 Estatísticas de Ações",
         description=f"Resumo de participação de {member.mention}.",
-        color=discord.Color.dark_blue(),
+        color=ui.UI_COLOR_MAIN,
     )
 
     if bot.user and bot.user.display_avatar:
@@ -352,8 +354,8 @@ def _build_embed_membro(bot: commands.Bot, member: discord.Member) -> discord.Em
 
     if por_acao:
         linhas = [
-            f"**{tipo}** — {t} ação(ões) | 🟢 {w} 🔴 {l}"
-            for tipo, t, w, l in por_acao
+            f"**{tipo}** — {t} ação(ões) | 🟢 {w} 🔴 {derrotas}"
+            for tipo, t, w, derrotas in por_acao
         ]
         embed.add_field(
             name="Locais mais jogados",
@@ -367,7 +369,7 @@ def _build_embed_membro(bot: commands.Bot, member: discord.Member) -> discord.Em
             inline=False,
         )
 
-    embed.set_footer(text="Polícia MetaCity")
+    # Rodapé padrão já incluso
     return embed
 
 
@@ -491,7 +493,9 @@ class StatusAcaoCog(commands.Cog):
         embed = _build_embed_global(self.bot)
         msg = await interaction.channel.send(embed=embed)
         self._status_message_id = msg.id
-        await interaction.response.send_message("Painel de status configurado com sucesso!", ephemeral=True)
+        await interaction.response.send_message(
+            embed=ui.build_success_embed("Painel de status configurado com sucesso!"), ephemeral=True
+        )
 
     # ------------------------------------------------------------------
     # COMANDO ADMIN: /sync_acoes
@@ -505,7 +509,9 @@ class StatusAcaoCog(commands.Cog):
         limite: int = 200,
     ) -> None:
         """Varre as últimas N mensagens do canal e importa ações ainda não registradas."""
-        await interaction.response.send_message(f"⏳ Sincronizando últimas {limite} mensagens...")
+        await interaction.response.send_message(
+            embed=ui.build_embed(title="⏳ Sincronizando...", description=f"Analisando últimas {limite} mensagens.")
+        )
 
         total_novos = 0
         async for message in interaction.channel.history(limit=limite):
@@ -515,7 +521,8 @@ class StatusAcaoCog(commands.Cog):
                 total_novos += 1
 
         await interaction.edit_original_response(
-            content=f"✅ Sincronização concluída. {total_novos} ação(ões) nova(s) importada(s)."
+            content=None,
+            embed=ui.build_success_embed(f"Sincronização concluída. {total_novos} ação(ões) nova(s) importada(s).")
         )
         await self._atualizar_embed_global()
 

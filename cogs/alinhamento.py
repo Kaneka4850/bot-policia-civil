@@ -3,13 +3,15 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 
+import utils.ui as ui
+
 # ─────────────────────────────────────────────
 # IDs centralizados
 # ─────────────────────────────────────────────
-CARGO_PERMITIDO    = # Permissão de advertência
-CANAL_ALINHAMENTO  = # Canal onde o embed de convocação é enviado
-CANAL_LOGS         = # Canal de logs
-LINK_CALL          = # Insira o link do canal de chamada do discord
+CARGO_PERMITIDO    = 1519099990587473926 # Cargo 🔑| Perm. Advertência
+CANAL_ALINHAMENTO  = 1519099991631593482 # Canal 📢・alinhamento
+CANAL_LOGS         = 1519099991266955301 # Canal 🤖・logs-bot 
+LINK_CALL          = "https://discord.com/channels/1519099990507520030/1519099991879188619" # 👑・Aguardando AC
 
 # ─────────────────────────────────────────────
 # Regex de validação
@@ -51,7 +53,7 @@ class AlinhamentoModal(discord.ui.Modal, title="📋 Convocar para Alinhamento")
         data_raw = self.data_alinhamento.value.strip()
         if not RE_DATA.match(data_raw):
             await interaction.response.send_message(
-                "❌ Data inválida. Use o formato **DD/MM/AAAA** (ex: 31/10/2018).",
+                embed=ui.build_warn_embed("Data inválida. Use o formato **DD/MM/AAAA** (ex: 31/10/2018)."),
                 ephemeral=True,
             )
             return
@@ -60,7 +62,7 @@ class AlinhamentoModal(discord.ui.Modal, title="📋 Convocar para Alinhamento")
         hora_raw = self.horario_alinhamento.value.strip()
         if not RE_HORARIO.match(hora_raw):
             await interaction.response.send_message(
-                "❌ Horário inválido. Use o formato **00h00** ou **00:00** (ex: 18h00).",
+                embed=ui.build_warn_embed("Horário inválido. Use o formato **00h00** ou **00:00** (ex: 18h00)."),
                 ephemeral=True,
             )
             return
@@ -72,7 +74,7 @@ class AlinhamentoModal(discord.ui.Modal, title="📋 Convocar para Alinhamento")
         id_raw = self.id_agente.value.strip()
         if not id_raw.isdigit():
             await interaction.response.send_message(
-                "❌ O ID do agente deve conter apenas números.",
+                embed=ui.build_warn_embed("O ID do agente deve conter apenas números."),
                 ephemeral=True,
             )
             return
@@ -88,7 +90,7 @@ class AlinhamentoModal(discord.ui.Modal, title="📋 Convocar para Alinhamento")
                 membro = await guild.fetch_member(membro_id)
             except discord.NotFound:
                 await interaction.response.send_message(
-                    "❌ Membro não encontrado neste servidor. Verifique o ID.",
+                    embed=ui.build_error_embed("Membro não encontrado neste servidor. Verifique o ID."),
                     ephemeral=True,
                 )
                 return
@@ -97,7 +99,7 @@ class AlinhamentoModal(discord.ui.Modal, title="📋 Convocar para Alinhamento")
         possui_cargo = any(r.id == CARGO_PERMITIDO for r in moderador.roles)
         if not possui_cargo:
             await interaction.response.send_message(
-                "⛔ Você não tem permissão para convocar membros.",
+                embed=ui.build_error_embed("Você não tem permissão para convocar membros."),
                 ephemeral=True,
             )
             return
@@ -106,20 +108,20 @@ class AlinhamentoModal(discord.ui.Modal, title="📋 Convocar para Alinhamento")
         canal_destino = self.bot.get_channel(CANAL_ALINHAMENTO)
         if canal_destino is None:
             await interaction.response.send_message(
-                "❌ Canal de alinhamento não encontrado.", ephemeral=True
+                embed=ui.build_error_embed("Canal de alinhamento não encontrado."), ephemeral=True
             )
             return
 
-        embed_conv = discord.Embed(
+        embed_conv = ui.build_embed(
             title="📋 Convocação para Alinhamento",
-            color=discord.Color.blue(),  # azul
-        )
-        embed_conv.description = (
-            f"Caro {membro.mention}!\n\n"
-            "Você foi convocado para o alinhamento para conversarmos sobre seus "
-            "atos de conduta na policia.\n\n"
-            f"Compareça à call através do link {LINK_CALL} no horário avisado abaixo "
-            "para que os pontos sejam alinhados."
+            description=(
+                f"Caro {membro.mention}!\n\n"
+                "Você foi convocado para o alinhamento para conversarmos sobre seus "
+                "atos de conduta no FBI.\n\n"
+                f"Compareça à call através do link {LINK_CALL} no horário avisado abaixo "
+                "para que os pontos sejam alinhados."
+            ),
+            color=ui.UI_COLOR_INFO,
         )
         embed_conv.add_field(
             name="🗓️ Data do alinhamento",
@@ -137,7 +139,7 @@ class AlinhamentoModal(discord.ui.Modal, title="📋 Convocar para Alinhamento")
             inline=False,
         )
         embed_conv.set_footer(
-            text="O não comparecimento em até 24hrs acarretará em sanções maiores.\n\nAtenciosamente, Alto comando da Polícia Civil"
+            text=f"{ui.FOOTER_TEXT} • O não comparecimento em até 24hrs acarretará em sanções maiores."
         )
 
         await canal_destino.send(content=f"|| {membro.mention} ||", embed=embed_conv)
@@ -145,22 +147,22 @@ class AlinhamentoModal(discord.ui.Modal, title="📋 Convocar para Alinhamento")
         # ── Log ──────────────────────────────────────────────────────
         canal_logs = self.bot.get_channel(CANAL_LOGS)
         if canal_logs:
-            log_embed = discord.Embed(
+            log_embed = ui.build_embed(
                 title="📋 Log de Alinhamento",
                 description=f"{moderador.mention} convocou {membro.mention}",
-                color=discord.Color.dark_purple(),
+                color=ui.UI_COLOR_MAIN,
             )
             log_embed.add_field(name="🗓️ Data", value=data_raw, inline=True)
             log_embed.add_field(name="⏰ Horário", value=hora_fmt, inline=True)
             log_embed.add_field(name="👤 Moderador", value=str(moderador), inline=False)
             log_embed.set_footer(
-                text=f"Preenchido por: {moderador} ({moderador.id})",
+                text=f"{ui.FOOTER_TEXT} • Preenchido por: {moderador} ({moderador.id})",
                 icon_url=moderador.display_avatar.url,
             )
             await canal_logs.send(embed=log_embed)
 
         await interaction.response.send_message(
-            f"✅ Convocação enviada para {membro.mention} com sucesso!", ephemeral=True
+            embed=ui.build_success_embed(f"Convocação enviada para {membro.mention} com sucesso!"), ephemeral=True
         )
 
 
@@ -186,7 +188,7 @@ class AlinhamentoView(discord.ui.View):
         possui_cargo = any(r.id == CARGO_PERMITIDO for r in interaction.user.roles)
         if not possui_cargo:
             await interaction.response.send_message(
-                "⛔ Você não tem permissão para convocar membros.", ephemeral=True
+                embed=ui.build_error_embed("Você não tem permissão para convocar membros."), ephemeral=True
             )
             return
 
@@ -210,21 +212,19 @@ class Convocacao(commands.Cog):
         """Envia o embed persistente com o botão de convocação."""
         possui_cargo = any(r.id == CARGO_PERMITIDO for r in interaction.user.roles)
         if not possui_cargo:
-            await interaction.response.send_message("⛔ Você não tem permissão para usar esse comando.", ephemeral=True)
+            await interaction.response.send_message(embed=ui.build_error_embed("Você não tem permissão para usar esse comando."), ephemeral=True)
             return
 
-        embed = discord.Embed(
+        embed = ui.build_embed(
             title="⚖️ Sistema de Alinhamento",
             description=(
                 "Clique no botão abaixo para preencher uma convocação de alinhamento.\n\n"
                 "Apenas membros autorizados podem realizar convocações."
             ),
-            color=discord.Color.blue(),
         )
-        embed.set_footer(text="Policia Civil de Meta City")
 
         await interaction.channel.send(embed=embed, view=AlinhamentoView(self.bot))
-        await interaction.response.send_message("Painel de alinhamento enviado com sucesso!", ephemeral=True)
+        await interaction.response.send_message(embed=ui.build_success_embed("Painel de alinhamento enviado com sucesso!"), ephemeral=True)
 
 
 

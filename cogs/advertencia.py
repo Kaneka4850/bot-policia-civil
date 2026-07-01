@@ -3,20 +3,22 @@ from discord.ext import commands
 from discord import app_commands
 from datetime import datetime, timezone
 
+import utils.ui as ui
+
 # ──────────────────────────────────────────────
 #  CONFIGURAÇÕES
 # ──────────────────────────────────────────────
-CARGOS_PERMITIDOS   = []       # Insira o id do cargo que pode dar advertencia
+CARGOS_PERMITIDOS   = [1519099990587473926]  # Cargo 🔑| Perm. Advertência
 
 CARGOS_ADVERTENCIA  = {
-    "ADV1": , # Insira o id do cargo ADV1
-    "ADV2": , #  Insira o id do cargo ADV2
-    "ADV3": , #  Insira o id do cargo ADV3
-    "ADV4": , #  Insira o id do cargo ADV4
+    "ADV1": 1519099990520369242, # Cargo ADV1
+    "ADV2": 1519099990507520039, # Cargo ADV2
+    "ADV3": 1519099990507520038, # Cargo ADV3
+    "ADV4": 1519099990507520037, # Cargo ADV4
 }
 
-CANAL_PENALIDADES_ID = # canal de penalidades (embed limpo)
-CANAL_LOG_ADV_ID     = # canal de log
+CANAL_PENALIDADES_ID = 1519099991631593485 # Canal 🗂️・penalidades
+CANAL_LOG_ADV_ID     = 1519099991266955301 # 🤖・logs-bot
 
 
 # ──────────────────────────────────────────────
@@ -65,13 +67,13 @@ class AdvertenciaModal(discord.ui.Modal, title="📄 Aplicar Advertência"):
 
         # ── Verifica permissão ──────────────────
         if not any(r.id in self.cog.cargos_permitidos for r in aplicador.roles):
-            await interaction.followup.send("⛔ Você não tem permissão para aplicar advertências.", ephemeral=True)
+            await interaction.followup.send(embed=ui.build_error_embed("Você não tem permissão para aplicar advertências."), ephemeral=True)
             return
 
         # ── Valida ID do membro ─────────────────
         membro_id_str = self.id_membro.value.strip()
         if not membro_id_str.isdigit():
-            await interaction.followup.send("⚠️ ID inválido. Digite apenas números.", ephemeral=True)
+            await interaction.followup.send(embed=ui.build_warn_embed("ID inválido. Digite apenas números."), ephemeral=True)
             return
 
         membro = guild.get_member(int(membro_id_str))
@@ -79,21 +81,21 @@ class AdvertenciaModal(discord.ui.Modal, title="📄 Aplicar Advertência"):
             try:
                 membro = await guild.fetch_member(int(membro_id_str))
             except discord.NotFound:
-                await interaction.followup.send("⚠️ Membro não encontrado neste servidor.", ephemeral=True)
+                await interaction.followup.send(embed=ui.build_warn_embed("Membro não encontrado neste servidor."), ephemeral=True)
                 return
 
         # ── Valida tipo ─────────────────────────
         tipo = self.tipo_adv.value.strip().upper()
         if tipo not in self.cog.cargos_advertencia:
             tipos_validos = ", ".join(self.cog.cargos_advertencia.keys())
-            await interaction.followup.send(f"⚠️ Tipo inválido. Use: `{tipos_validos}`", ephemeral=True)
+            await interaction.followup.send(embed=ui.build_warn_embed(f"Tipo inválido. Use: `{tipos_validos}`"), ephemeral=True)
             return
 
         # ── Valida duração ──────────────────────
         duracao_str = self.duracao.value.strip()
         if duracao_str:
             if not duracao_str.isdigit() or int(duracao_str) <= 0:
-                await interaction.followup.send("⚠️ Duração inválida. Digite um número inteiro positivo ou deixe em branco.", ephemeral=True)
+                await interaction.followup.send(embed=ui.build_warn_embed("Duração inválida. Digite um número inteiro positivo ou deixe em branco."), ephemeral=True)
                 return
             duracao_dias = int(duracao_str)
         else:
@@ -107,15 +109,15 @@ class AdvertenciaModal(discord.ui.Modal, title="📄 Aplicar Advertência"):
         cargo    = guild.get_role(cargo_id)
 
         if not cargo:
-            await interaction.followup.send("⚠️ Cargo de advertência não encontrado. Verifique o ID.", ephemeral=True)
+            await interaction.followup.send(embed=ui.build_error_embed("Cargo de advertência não encontrado. Verifique o ID."), ephemeral=True)
             return
 
         if cargo.position >= guild.me.top_role.position:
-            await interaction.followup.send("⚠️ Esse cargo está acima do meu na hierarquia. Não consigo aplicá-lo.", ephemeral=True)
+            await interaction.followup.send(embed=ui.build_error_embed("Esse cargo está acima do meu na hierarquia. Não consigo aplicá-lo."), ephemeral=True)
             return
 
         if membro.top_role.position >= guild.me.top_role.position:
-            await interaction.followup.send("⚠️ Esse membro tem um cargo acima ou igual ao meu. Não posso modificá-lo.", ephemeral=True)
+            await interaction.followup.send(embed=ui.build_error_embed("Esse membro tem um cargo acima ou igual ao meu. Não posso modificá-lo."), ephemeral=True)
             return
 
         # ── Remove cargos de advertência anteriores e aplica o novo ────
@@ -129,25 +131,27 @@ class AdvertenciaModal(discord.ui.Modal, title="📄 Aplicar Advertência"):
         agora = datetime.now(timezone.utc).strftime("%d/%m/%Y às %H:%M")
 
         # ── Embed de penalidades (limpo) ────────
-        embed_penalidades = discord.Embed(
+        embed_penalidades = ui.build_embed(
             title="📄 Advertência Aplicada",
             description=f"<@{membro.id}> recebeu uma advertência do tipo **{tipo}**.",
-            color=discord.Color.orange(),
+            color=ui.UI_COLOR_WARNING,
         )
         embed_penalidades.add_field(name="📝 Motivo",    value=motivo_texto,      inline=False)
         embed_penalidades.add_field(name="⏳ Duração",   value=duracao_label,     inline=True)
         embed_penalidades.add_field(name="👤 Aplicador", value=aplicador.mention, inline=True)
+        # ui.build_embed já adiciona o rodapé padrão, mas vamos sobrescrever para adicionar mais info
         embed_penalidades.set_footer(
-            text=f"Ação realizada em {agora}",
+            text=f"{ui.FOOTER_TEXT} • Ação realizada em {agora}",
             icon_url=aplicador.avatar.url if aplicador.avatar else None,
         )
 
         # ── Embed de log (detalhado) ────────────
-        embed_log = discord.Embed(
+        embed_log = ui.build_embed(
             title="📋 Log de Advertência",
-            color=discord.Color.red(),
-            timestamp=datetime.now(timezone.utc),
+            description="Registro de nova advertência.",
+            color=ui.UI_COLOR_ERROR,
         )
+        embed_log.timestamp = datetime.now(timezone.utc)
         embed_log.add_field(name="👤 Membro advertido", value=f"{membro.mention}\n`{membro.id}`",        inline=True)
         embed_log.add_field(name="🔖 Tipo",             value=tipo,                                      inline=True)
         embed_log.add_field(name="⏳ Duração",          value=duracao_label,                             inline=True)
@@ -155,7 +159,7 @@ class AdvertenciaModal(discord.ui.Modal, title="📄 Aplicar Advertência"):
         embed_log.add_field(name="🛡️ Aplicador",       value=f"{aplicador.mention}\n`{aplicador.id}`", inline=True)
         embed_log.add_field(name="📅 Data/Hora",        value=agora,                                     inline=True)
         embed_log.set_thumbnail(url=membro.avatar.url if membro.avatar else None)
-        embed_log.set_footer(text=f"Servidor: {guild.name}")
+        embed_log.set_footer(text=f"{ui.FOOTER_TEXT} • Servidor: {guild.name}")
 
         # ── DM ao membro ────────────────────────
         try:
@@ -174,7 +178,7 @@ class AdvertenciaModal(discord.ui.Modal, title="📄 Aplicar Advertência"):
         if canal_penalidades:
             await canal_penalidades.send(content=f"<@{membro.id}>", embed=embed_penalidades)
         else:
-            await interaction.followup.send("⚠️ Canal de penalidades não encontrado.", ephemeral=True)
+            await interaction.followup.send(embed=ui.build_error_embed("Canal de penalidades não encontrado."), ephemeral=True)
 
         # ── Envia no canal de log ───────────────
         canal_log = self.cog.bot.get_channel(self.cog.canal_log_adv_id)
@@ -183,7 +187,7 @@ class AdvertenciaModal(discord.ui.Modal, title="📄 Aplicar Advertência"):
 
         # ── Confirmação ephemeral ───────────────
         await interaction.followup.send(
-            f"✅ Advertência **{tipo}** aplicada a <@{membro.id}> com sucesso.",
+            embed=ui.build_success_embed(f"Advertência **{tipo}** aplicada a <@{membro.id}> com sucesso."),
             ephemeral=True,
         )
 
@@ -205,12 +209,12 @@ class AdvertenciaView(discord.ui.View):
     async def abrir_modal(self, interaction: discord.Interaction, button: discord.ui.Button):
         cog = interaction.client.cogs.get("Advertencias")
         if not cog:
-            await interaction.response.send_message("⚠️ Cog não carregada.", ephemeral=True)
+            await interaction.response.send_message(embed=ui.build_error_embed("Cog não carregada."), ephemeral=True)
             return
 
         # Verifica permissão antes de abrir o modal
         if not any(r.id in cog.cargos_permitidos for r in interaction.user.roles):
-            await interaction.response.send_message("⛔ Você não tem permissão para usar isso.", ephemeral=True)
+            await interaction.response.send_message(embed=ui.build_error_embed("Você não tem permissão para usar isso."), ephemeral=True)
             return
 
         await interaction.response.send_modal(AdvertenciaModal(cog))
@@ -239,7 +243,7 @@ class Advertencias(commands.Cog):
         Envia o embed persistente de advertência no canal atual.
         Apenas administradores podem executar esse comando.
         """
-        embed = discord.Embed(
+        embed = ui.build_embed(
             title="⚠️ Sistema de Advertências",
             description=(
                 "Clique no botão abaixo para abrir o formulário de advertência.\n\n"
@@ -249,12 +253,11 @@ class Advertencias(commands.Cog):
                 "• **Duração** em dias (opcional — permanente se vazio)\n"
                 "• **Motivo** da advertência"
             ),
-            color=discord.Color.dark_red(),
         )
-        embed.set_footer(text="Apenas oficiais autorizados podem aplicar advertências.")
+        embed.set_footer(text=f"{ui.FOOTER_TEXT} • Apenas oficiais autorizados podem aplicar advertências.")
 
         await interaction.channel.send(embed=embed, view=AdvertenciaView())
-        await interaction.response.send_message("Painel de advertência enviado com sucesso!", ephemeral=True)
+        await interaction.response.send_message(embed=ui.build_success_embed("Painel de advertência enviado com sucesso!"), ephemeral=True)
 
 
 # ──────────────────────────────────────────────

@@ -4,13 +4,15 @@ from discord import app_commands
 from discord import ui
 import re
 
+import utils.ui as uiu
+
 # ============================================================
 #  CONSTANTES — ajuste conforme seu servidor
 # ============================================================
-CARGO_INSTRUTOR_ID    = # Cargo autorizado a passar os cursos
-CARGO_POLICIA_ID      = # ID do cargo a ser mencionado no embed
-CANAL_CURSOS_ID       = # ID do canal os cursos serão avisados
-CURSOS_PENDENTES      = # Canal para solicitar aprovação do curso
+CARGO_INSTRUTOR_ID    = 1519099990558118141 # Cargo 🧑‍🏫| Instrutor
+CARGO_POLICIA_ID      = 1519099990507520035 # Cago FBI 
+CANAL_CURSOS_ID       = 1519099992600608805 # Canal 🚨・avisos-cursos
+CURSOS_PENDENTES      = 1519099992600608806 # Canal 📋・solicitar-curso
 # ============================================================
 
 # ---------------------------------------------------------------------------
@@ -40,9 +42,9 @@ class AgendarCursoModal(ui.Modal, title="Agendar Curso"):
 
     local = ui.TextInput(
         label="Local",
-        placeholder="Ex: DP da policia civil",
+        placeholder="Ex: DP do FBI",
         max_length=100,
-        default="DP da policia civil",
+        default="DP do FBI",
     )
 
     def __init__(self, criador_id: int):
@@ -53,7 +55,7 @@ class AgendarCursoModal(ui.Modal, title="Agendar Curso"):
         # ── validação data ──
         if not re.fullmatch(r"\d{2}/\d{2}/\d{4}", self.data.value.strip()):
             await interaction.response.send_message(
-                "❌ Data inválida. Use o formato **DD/MM/AAAA**.", ephemeral=True
+                embed=uiu.build_warn_embed("Data inválida. Use o formato **DD/MM/AAAA**."), ephemeral=True
             )
             return
 
@@ -61,7 +63,7 @@ class AgendarCursoModal(ui.Modal, title="Agendar Curso"):
         hora_raw = self.hora.value.strip()
         if not re.fullmatch(r"\d{1,2}[h:]\d{2}", hora_raw):
             await interaction.response.send_message(
-                "❌ Hora inválida. Use **18h00** ou **18:00**.", ephemeral=True
+                embed=uiu.build_warn_embed("Hora inválida. Use **18h00** ou **18:00**."), ephemeral=True
             )
             return
 
@@ -73,14 +75,14 @@ class AgendarCursoModal(ui.Modal, title="Agendar Curso"):
             cargo_id_int = int(self.cargo_id.value.strip())
         except ValueError:
             await interaction.response.send_message(
-                "❌ ID do cargo inválido. Deve ser um número.", ephemeral=True
+                embed=uiu.build_error_embed("ID do cargo inválido. Deve ser um número."), ephemeral=True
             )
             return
 
         cargo_curso = interaction.guild.get_role(cargo_id_int)
         if cargo_curso is None:
             await interaction.response.send_message(
-                "❌ Cargo não encontrado neste servidor. Verifique o ID.", ephemeral=True
+                embed=uiu.build_error_embed("Cargo não encontrado neste servidor. Verifique o ID."), ephemeral=True
             )
             return
 
@@ -88,9 +90,9 @@ class AgendarCursoModal(ui.Modal, title="Agendar Curso"):
         cargo_instrutor = interaction.guild.get_role(CARGO_INSTRUTOR_ID)
         if cargo_instrutor and cargo_curso.position >= cargo_instrutor.position:
             await interaction.response.send_message(
-                f"🚫 O cargo **{cargo_curso.name}** está na mesma posição ou acima do cargo de "
+                embed=uiu.build_error_embed(f"O cargo **{cargo_curso.name}** está na mesma posição ou acima do cargo de "
                 f"**Instrutor** na hierarquia do servidor.\n"
-                f"Apenas cargos abaixo do Instrutor podem ser concedidos por cursos.",
+                f"Apenas cargos abaixo do Instrutor podem ser concedidos por cursos."),
                 ephemeral=True,
             )
             return
@@ -100,7 +102,7 @@ class AgendarCursoModal(ui.Modal, title="Agendar Curso"):
 
         if canal_cursos is None:
             await interaction.response.send_message(
-                "❌ Canal de cursos não encontrado. Verifique CANAL_CURSOS_ID.", ephemeral=True
+                embed=uiu.build_error_embed("Canal de cursos não encontrado. Verifique CANAL_CURSOS_ID."), ephemeral=True
             )
             return
 
@@ -109,9 +111,9 @@ class AgendarCursoModal(ui.Modal, title="Agendar Curso"):
         bot_avatar = bot_user.display_avatar.url if bot_user else None
 
         # ── embed de aviso ──
-        embed = discord.Embed(
+        embed = uiu.build_embed(
             title=f"📋 Curso: {self.nome_curso.value.strip()}",
-            color=discord.Color.blue(),
+            color=uiu.UI_COLOR_INFO,
         )
         if bot_avatar:
             embed.set_thumbnail(url=bot_avatar)
@@ -144,7 +146,7 @@ class AgendarCursoModal(ui.Modal, title="Agendar Curso"):
         view.message_id = msg.id
 
         await interaction.response.send_message(
-            f"✅ Curso **{self.nome_curso.value.strip()}** agendado com sucesso!", ephemeral=True
+            embed=uiu.build_success_embed(f"Curso **{self.nome_curso.value.strip()}** agendado com sucesso!"), ephemeral=True
         )
 
 
@@ -164,16 +166,16 @@ class AvisoCursoView(ui.View):
         canal_pendentes = interaction.guild.get_channel(CURSOS_PENDENTES)
         if canal_pendentes is None:
             await interaction.response.send_message(
-                "❌ Canal de pendências não encontrado.", ephemeral=True
+                embed=uiu.build_error_embed("Canal de pendências não encontrado."), ephemeral=True
             )
             return
 
         aluno_avatar = interaction.user.display_avatar.url
 
-        embed = discord.Embed(
+        embed = uiu.build_embed(
             title="🕐 Solicitação Pendente",
             description=f"**{interaction.user.mention}** solicitou aprovação no curso **{self.nome_curso}**.",
-            color=discord.Color.yellow(),
+            color=uiu.UI_COLOR_WARNING,
         )
         embed.set_thumbnail(url=aluno_avatar)
         embed.set_author(name=interaction.user.display_name, icon_url=aluno_avatar)
@@ -181,7 +183,7 @@ class AvisoCursoView(ui.View):
         embed.add_field(name="Curso",       value=self.nome_curso,                  inline=True)
         embed.add_field(name="Aprovador",   value=f"<@{self.criador_id}>",          inline=False)
         embed.add_field(name="Status",      value="🟡 Aguardando avaliação",        inline=False)
-        embed.set_footer(text=f"User ID: {interaction.user.id}")
+        embed.set_footer(text=f"{uiu.FOOTER_TEXT} • User ID: {interaction.user.id}")
 
         view = AvaliacaoView(
             criador_id=self.criador_id,
@@ -192,7 +194,7 @@ class AvisoCursoView(ui.View):
 
         await canal_pendentes.send(embed=embed, view=view)
         await interaction.response.send_message(
-            "✅ Sua solicitação foi enviada! Aguarde a avaliação do instrutor.", ephemeral=True
+            embed=uiu.build_success_embed("Sua solicitação foi enviada! Aguarde a avaliação do instrutor."), ephemeral=True
         )
 
 
@@ -214,7 +216,7 @@ class AvaliacaoView(ui.View):
     async def aprovar(self, interaction: discord.Interaction, button: ui.Button):
         if not self._somente_criador(interaction):
             await interaction.response.send_message(
-                "❌ Apenas o instrutor que criou o curso pode aprovar/reprovar.", ephemeral=True
+                embed=uiu.build_error_embed("Apenas o instrutor que criou o curso pode aprovar/reprovar."), ephemeral=True
             )
             return
 
@@ -223,7 +225,7 @@ class AvaliacaoView(ui.View):
 
         if aluno is None:
             await interaction.response.send_message(
-                "❌ Aluno não encontrado no servidor.", ephemeral=True
+                embed=uiu.build_error_embed("Aluno não encontrado no servidor."), ephemeral=True
             )
             return
 
@@ -235,7 +237,7 @@ class AvaliacaoView(ui.View):
             item.disabled = True
 
         embed = interaction.message.embeds[0]
-        embed.color = discord.Color.green()
+        embed.color = uiu.UI_COLOR_SUCCESS
         embed.title = "✅ Solicitação Aprovada"
 
         # atualiza campo Status
@@ -247,7 +249,7 @@ class AvaliacaoView(ui.View):
 
         await interaction.message.edit(embed=embed, view=self)
         await interaction.response.send_message(
-            f"✅ {aluno.mention} aprovado(a) e cargo **{cargo.name if cargo else self.cargo_curso_id}** concedido.",
+            embed=uiu.build_success_embed(f"{aluno.mention} aprovado(a) e cargo **{cargo.name if cargo else self.cargo_curso_id}** concedido."),
             ephemeral=True,
         )
 
@@ -255,7 +257,7 @@ class AvaliacaoView(ui.View):
     async def reprovar(self, interaction: discord.Interaction, button: ui.Button):
         if not self._somente_criador(interaction):
             await interaction.response.send_message(
-                "❌ Apenas o instrutor que criou o curso pode aprovar/reprovar.", ephemeral=True
+                embed=uiu.build_error_embed("Apenas o instrutor que criou o curso pode aprovar/reprovar."), ephemeral=True
             )
             return
 
@@ -276,7 +278,7 @@ class AvaliacaoView(ui.View):
             item.disabled = True
 
         embed = interaction.message.embeds[0]
-        embed.color = discord.Color.red()
+        embed.color = uiu.UI_COLOR_ERROR
         embed.title = "❌ Solicitação Reprovada"
 
         # atualiza campo Status
@@ -288,7 +290,7 @@ class AvaliacaoView(ui.View):
 
         await interaction.message.edit(embed=embed, view=self)
         await interaction.response.send_message(
-            f"❌ {aluno.mention if aluno else self.aluno_id} reprovado(a). DM enviada.", ephemeral=True
+            embed=uiu.build_success_embed(f"{aluno.mention if aluno else self.aluno_id} reprovado(a). DM enviada."), ephemeral=True
         )
 
 
@@ -314,7 +316,7 @@ class SetupCursosView(ui.View):
     async def agendar_curso(self, interaction: discord.Interaction, button: ui.Button):
         if not self._tem_permissao(interaction):
             await interaction.response.send_message(
-                "❌ Você precisa ter o cargo de **Instrutor** ou ser **Administrador** para agendar cursos.",
+                embed=uiu.build_error_embed("Você precisa ter o cargo de **Instrutor** ou ser **Administrador** para agendar cursos."),
                 ephemeral=True,
             )
             return
@@ -340,21 +342,21 @@ class SetupCursos(commands.Cog):
         bot_user   = interaction.client.user
         bot_avatar = bot_user.display_avatar.url if bot_user else None
 
-        embed = discord.Embed(
+        embed = uiu.build_embed(
             title="🎓 Sistema de Cursos",
             description=(
                 "Bem-vindo ao sistema de cursos da corporação!\n\n"
                 "Instrutores podem agendar novos cursos clicando no botão abaixo."
             ),
-            color=discord.Color.blurple(),
+            color=uiu.UI_COLOR_MAIN,
         )
         if bot_avatar:
             embed.set_thumbnail(url=bot_avatar)
             embed.set_author(name=bot_user.display_name, icon_url=bot_avatar)
-        embed.set_footer(text="Apenas instrutores e administradores podem agendar cursos.")
+        embed.set_footer(text=f"{uiu.FOOTER_TEXT} • Apenas instrutores e administradores podem agendar cursos.")
 
         await interaction.channel.send(embed=embed, view=SetupCursosView())
-        await interaction.response.send_message("Painel de cursos enviado com sucesso!", ephemeral=True)
+        await interaction.response.send_message(embed=uiu.build_success_embed("Painel de cursos enviado com sucesso!"), ephemeral=True)
 
 
 async def setup(bot: commands.Bot):

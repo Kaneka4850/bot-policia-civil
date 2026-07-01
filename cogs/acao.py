@@ -3,6 +3,8 @@ from discord.ext import commands
 from discord import app_commands
 import re
 
+import utils.ui as ui
+
 # ──────────────────────────────────────────────
 # 📋 CANAIS QUE RECEBERÃO O RELATÓRIO
 # ──────────────────────────────────────────────
@@ -91,7 +93,7 @@ class ViewParticipacao(discord.ui.View):
         idx_membros = self._get_field_index(embed, FIELD_MEMBROS)
         if idx_membros is None:
             await interaction.followup.send(
-                "⚠️ Não foi possível encontrar o campo de membros no relatório.", ephemeral=True
+                embed=ui.build_warn_embed("Não foi possível encontrar o campo de membros no relatório."), ephemeral=True
             )
             return
 
@@ -100,7 +102,7 @@ class ViewParticipacao(discord.ui.View):
         # Duplicata
         if user_mention in membros_atuais:
             await interaction.followup.send(
-                "Você já confirmou participação nesta ação!", ephemeral=True
+                embed=ui.build_warn_embed("Você já confirmou participação nesta ação!"), ephemeral=True
             )
             return
 
@@ -108,7 +110,7 @@ class ViewParticipacao(discord.ui.View):
         confirmados, limite = self._parse_limite(embed)
         if limite > 0 and confirmados >= limite:
             await interaction.followup.send(
-                f"❌ Limite de **{limite} membros** atingido. Não há mais vagas nesta ação.",
+                embed=ui.build_error_embed(f"Limite de **{limite} membros** atingido. Não há mais vagas nesta ação."),
                 ephemeral=True,
             )
             return
@@ -135,7 +137,7 @@ class ViewParticipacao(discord.ui.View):
 
         await interaction.message.edit(embed=embed)
         await interaction.followup.send(
-            "✅ Sua participação foi confirmada com sucesso!", ephemeral=True
+            embed=ui.build_success_embed("Sua participação foi confirmada com sucesso!"), ephemeral=True
         )
 
     # ------------------------------------------------------------------
@@ -161,7 +163,7 @@ class ViewParticipacao(discord.ui.View):
         idx_membros = self._get_field_index(embed, FIELD_MEMBROS)
         if idx_membros is None:
             await interaction.followup.send(
-                "⚠️ Não foi possível encontrar o campo de membros no relatório.", ephemeral=True
+                embed=ui.build_warn_embed("Não foi possível encontrar o campo de membros no relatório."), ephemeral=True
             )
             return
 
@@ -169,7 +171,7 @@ class ViewParticipacao(discord.ui.View):
 
         if user_mention not in membros_atuais:
             await interaction.followup.send(
-                "Você não está na lista de participantes desta ação.", ephemeral=True
+                embed=ui.build_warn_embed("Você não está na lista de participantes desta ação."), ephemeral=True
             )
             return
 
@@ -198,7 +200,7 @@ class ViewParticipacao(discord.ui.View):
 
         await interaction.message.edit(embed=embed)
         await interaction.followup.send(
-            "✅ Sua participação foi cancelada.", ephemeral=True
+            embed=ui.build_success_embed("Sua participação foi cancelada."), ephemeral=True
         )
 
 
@@ -267,7 +269,7 @@ class ModalAcao(discord.ui.Modal, title="Registro de Ação"):
         palavra_chave = partes_resultado[0].lower()
 
         is_win = palavra_chave in ("win", "vitória", "vitoria")
-        cor = discord.Color.green() if is_win else discord.Color.red()
+        cor = ui.UI_COLOR_SUCCESS if is_win else ui.UI_COLOR_ERROR
         descricao = (
             "**Ação finalizada com vitória** 🏆"
             if is_win
@@ -339,7 +341,7 @@ class ModalAcao(discord.ui.Modal, title="Registro de Ação"):
             vagas_valor = f"{len(membros_iniciais)}/{limite}"
 
         # ── Montar Embed ───────────────────────────────────────────────
-        embed = discord.Embed(
+        embed = ui.build_embed(
             title="📝 RELATÓRIO DE AÇÃO",
             description=descricao,
             color=cor,
@@ -370,12 +372,14 @@ class ModalAcao(discord.ui.Modal, title="Registro de Ação"):
 
         if enviados > 0:
             await interaction.response.send_message(
-                "✅ Relatório de ação registrado e enviado com sucesso!", ephemeral=True
+                embed=ui.build_success_embed("Relatório de ação registrado e enviado com sucesso!"), ephemeral=True
             )
         else:
             await interaction.response.send_message(
-                "⚠️ Relatório gerado, mas não encontrei os canais de envio. "
-                "Verifique os IDs em `CANAIS_ENVIO`.",
+                embed=ui.build_warn_embed(
+                    "Relatório gerado, mas não encontrei os canais de envio. "
+                    "Verifique os IDs em `CANAIS_ENVIO`."
+                ),
                 ephemeral=True,
             )
 
@@ -383,7 +387,7 @@ class ModalAcao(discord.ui.Modal, title="Registro de Ação"):
         self, interaction: discord.Interaction, error: Exception
     ) -> None:
         await interaction.response.send_message(
-            "❌ Ocorreu um erro ao processar o formulário. Tente novamente.", ephemeral=True
+            embed=ui.build_error_embed("Ocorreu um erro ao processar o formulário. Tente novamente."), ephemeral=True
         )
         raise error  # propaga para o log do bot
 
@@ -434,7 +438,7 @@ class AcaoCog(commands.Cog):
     @app_commands.default_permissions(administrator=True)
     async def setup_painel(self, interaction: discord.Interaction) -> None:
         """Envia o painel de registro de ações no canal atual."""
-        embed = discord.Embed(
+        embed = ui.build_embed(
             title="🚓 Central de Registros de Ações",
             description=(
                 "Clique no botão abaixo para preencher o relatório da operação.\n\n"
@@ -443,11 +447,12 @@ class AcaoCog(commands.Cog):
                 "• No campo Resultado, escreva **Win** ou **Loss** na primeira linha\n"
                 "  e os itens apreendidos nas linhas seguintes (apenas para Win)\n"
                 "• Defina o número máximo de membros (0 = sem limite)"
-            ),
-            color=discord.Color.dark_gray(),
+            )
         )
         await interaction.channel.send(embed=embed, view=ViewAcao())
-        await interaction.response.send_message("Painel de ação enviado com sucesso!", ephemeral=True)
+        await interaction.response.send_message(
+            embed=ui.build_success_embed("Painel de ação enviado com sucesso!"), ephemeral=True
+        )
 
 
 async def setup(bot: commands.Bot) -> None:

@@ -1,11 +1,13 @@
 import discord
 from discord.ext import commands
 from discord import app_commands
-from datetime import datetime
+from datetime import datetime, timezone
+
+import utils.ui as ui
 
 # --- CONFIGURAÇÕES ---
 # ID do canal onde os registros de ausência serão enviados
-ID_CANAL_LOGS = # Insira o ID aqui  
+ID_CANAL_LOGS = 1519099991266955301 # Canal logs bot 
 
 class AbsenceModal(discord.ui.Modal, title="Formulário de Ausência"):
     """
@@ -55,33 +57,33 @@ class AbsenceModal(discord.ui.Modal, title="Formulário de Ausência"):
         # Validação de datas antes de prosseguir
         if not self.is_valid_date(self.inicio.value) or not self.is_valid_date(self.termino.value):
             return await interaction.response.send_message(
-                "❌ Erro: Uma das datas inseridas é inválida. Use o formato DD/MM/YYYY.", 
+                embed=ui.build_error_embed("Uma das datas inseridas é inválida. Use o formato DD/MM/YYYY."), 
                 ephemeral=True
             )
 
         log_channel = interaction.guild.get_channel(ID_CANAL_LOGS)
         if not log_channel:
             return await interaction.response.send_message(
-                "❌ Erro crítico: Canal de logs não configurado corretamente.", 
+                embed=ui.build_error_embed("Canal de logs não configurado corretamente."), 
                 ephemeral=True
             )
 
         # Construção do Embed de Log
-        embed = discord.Embed(
+        embed = ui.build_embed(
             title="📌 Ausência Registrada",
             description=f"O oficial {interaction.user.mention} solicitou um período de ausência.",
-            color=discord.Color.dark_orange(),
-            timestamp=datetime.now()
+            color=ui.UI_COLOR_WARNING,
         )
+        embed.timestamp = datetime.now(timezone.utc)
         embed.add_field(name="🆔 QRA", value=self.qra.value, inline=True)
         embed.add_field(name="📅 Período", value=f"{self.inicio.value} ➔ {self.termino.value}", inline=True)
         embed.add_field(name="📝 Motivo", value=self.motivo.value, inline=True)
-        embed.set_footer(text=f"ID do Usuário: {interaction.user.id}")
+        embed.set_footer(text=f"{ui.FOOTER_TEXT} • ID do Usuário: {interaction.user.id}")
 
         # Envio para o canal de logs mencionando o usuário
         await log_channel.send(content=f"🔔 Nova ausência: {interaction.user.mention}", embed=embed)
         
-        await interaction.response.send_message("✅ Sua ausência foi registrada com sucesso!", ephemeral=True)
+        await interaction.response.send_message(embed=ui.build_success_embed("Sua ausência foi registrada com sucesso!"), ephemeral=True)
 
 
 class AbsencePersistentView(discord.ui.View):
@@ -118,7 +120,7 @@ class AbsenceCog(commands.Cog):
         """
         Envia a mensagem principal com o botão de ausência.
         """
-        embed = discord.Embed(
+        embed = ui.build_embed(
             title="✈️ Registro de Ausência",
             description=(
                 "Utilize o botão abaixo para preencher o formulário de ausência.\n\n"
@@ -127,11 +129,10 @@ class AbsenceCog(commands.Cog):
                 "• Use apenas o formato **DD/MM/YYYY** para datas.\n"
                 "• Informe um motivo claro."
             ),
-            color=discord.Color.dark_orange()
         )
         
         await interaction.channel.send(embed=embed, view=AbsencePersistentView())
-        await interaction.response.send_message("Painel de ausência enviado com sucesso!", ephemeral=True)
+        await interaction.response.send_message(embed=ui.build_success_embed("Painel de ausência enviado com sucesso!"), ephemeral=True)
 
 
 async def setup(bot: commands.Bot):

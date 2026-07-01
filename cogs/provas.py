@@ -2,6 +2,8 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 
+import utils.ui as ui
+
 # 🧩 Esta classe cuida apenas da INTERFACE (o botão e a criação dos canais)
 class ProvasView(discord.ui.View):
     def __init__(self):
@@ -13,13 +15,13 @@ class ProvasView(discord.ui.View):
         guild = interaction.guild
         user = interaction.user
         
-        # 🛡️ Verificação de Cargo (Polícia Civil)
-        ID_CARGO_POLICIA = 1394099683265220690
+        # 🛡️ Verificação de Cargo (FBI)
+        ID_CARGO_POLICIA = 1519099990507520035 # Cargo FBI
         tem_cargo = any(role.id == ID_CARGO_POLICIA for role in user.roles)
 
         if not tem_cargo:
             return await interaction.response.send_message(
-                "❌ Você não tem permissão de criar a aba de provas, por favor faça seu cadastro ou procure um delegado para suporte.", 
+                embed=ui.build_error_embed("Você não tem permissão de criar a aba de provas, por favor faça seu cadastro ou procure um delegado para suporte."), 
                 ephemeral=True
             )
 
@@ -29,7 +31,7 @@ class ProvasView(discord.ui.View):
         
         if categoria_existente:
             return await interaction.response.send_message(
-                f"🎫 Você já tem um canal em `{categoria_nome}`.", 
+                embed=ui.build_warn_embed(f"Você já tem um canal em `{categoria_nome}`."), 
                 ephemeral=True
             )
 
@@ -50,10 +52,10 @@ class ProvasView(discord.ui.View):
             for nome_canal in canais:
                 await guild.create_text_channel(nome_canal, category=cat)
 
-            await interaction.followup.send(f"✅ Canais criados na categoria `{categoria_nome}`!", ephemeral=True)
+            await interaction.followup.send(embed=ui.build_success_embed(f"Canais criados na categoria `{categoria_nome}`!"), ephemeral=True)
             
         except discord.Forbidden:
-            await interaction.followup.send("❌ O bot não tem permissão para gerenciar canais.", ephemeral=True)
+            await interaction.followup.send(embed=ui.build_error_embed("O bot não tem permissão para gerenciar canais."), ephemeral=True)
 
 
 # 🚀 Esta classe cuida apenas do COMANDO de Setup
@@ -72,7 +74,7 @@ class Provas(commands.Cog):
         """Envia o painel permanente de criação de provas"""
             
         # 📝 Criação do Embed com estética semelhante aos prints enviados
-        embed = discord.Embed(
+        embed = ui.build_embed(
             title="CRIE SUA ABA DE PROVAS",
             description=(
                 "▶️ | Clique no botão abaixo para criar sua categoria individual de provas.\n\n"
@@ -80,12 +82,12 @@ class Provas(commands.Cog):
                 "Utilize seu canal de forma organizada para registrar suas ocorrências.\n\n"
                 "👮‍♂️ • Atenciosamente, Arima"
             ),
-            color=discord.Color.dark_theme()
+            color=ui.UI_COLOR_MAIN
         )
         
         view = ProvasView()
         await interaction.channel.send(embed=embed, view=view)
-        await interaction.response.send_message("Painel de provas enviado com sucesso!", ephemeral=True)
+        await interaction.response.send_message(embed=ui.build_success_embed("Painel de provas enviado com sucesso!"), ephemeral=True)
 
 
 # 🛠️ Setup da extensão

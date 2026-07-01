@@ -5,12 +5,13 @@ import asyncio
 import io
 import aiohttp
 from datetime import datetime
+import utils.ui as ui
 
 # ==========================================
 # VARIÁVEIS DE CONFIGURAÇÃO
 # ==========================================
-CARGO_AUTORIZADO = # Cargo que pode fazer o registro
-CANAL_REGISTRO   = # Canal onde a log final será enviada
+CARGO_AUTORIZADO = 1519099990520369249 # Cargo 📗┋Curso Prisão
+CANAL_REGISTRO   = 1519099992348819464 # Canal 🦝・painel-prisões
 
 TIMEOUT_POR_PERGUNTA = 600.0  # 10 minutos por resposta
 TIMEOUT_GLOBAL       = 3600.0 # 1 hora no total — segurança contra formulários eternos
@@ -58,7 +59,7 @@ class PrisaoView(discord.ui.View):
         tem_cargo = discord.utils.get(membro.roles, id=CARGO_AUTORIZADO)
         if not (membro.guild_permissions.administrator or tem_cargo):
             await interaction.response.send_message(
-                "🚫 Você não tem permissão (Curso de Prisão) para iniciar um registro.",
+                embed=ui.build_error_embed("Você não tem permissão (Curso de Prisão) para iniciar um registro."),
                 ephemeral=True
             )
             return
@@ -69,7 +70,7 @@ class PrisaoView(discord.ui.View):
         canal_existente = discord.utils.get(guild.text_channels, name=nome_esperado)
         if canal_existente:
             await interaction.response.send_message(
-                f"⚠️ Você já tem um registro em andamento: {canal_existente.mention}",
+                embed=ui.build_warn_embed(f"Você já tem um registro em andamento: {canal_existente.mention}"),
                 ephemeral=True
             )
             return
@@ -89,13 +90,13 @@ class PrisaoView(discord.ui.View):
             )
         except discord.Forbidden:
             await interaction.response.send_message(
-                "🚨 Sem permissão para criar canais. Contate a administração.",
+                embed=ui.build_error_embed("Sem permissão para criar canais. Contate a administração."),
                 ephemeral=True
             )
             return
 
         await interaction.response.send_message(
-            f"✅ Seu canal de registro foi criado: {canal_temporario.mention}",
+            embed=ui.build_success_embed(f"Seu canal de registro foi criado: {canal_temporario.mention}"),
             ephemeral=True
         )
 
@@ -118,16 +119,16 @@ class RegistroPrisao(commands.Cog):
     @app_commands.default_permissions(administrator=True)
     async def setup_prisao(self, interaction: discord.Interaction):
         """Cria o embed com o botão persistente de registro de prisão."""
-        embed = discord.Embed(
+        embed = ui.build_embed(
             title="🚔 Sistema de Registro de Prisões",
             description=(
                 "Clique no botão abaixo para iniciar um novo registro de prisão.\n"
                 "Um canal privado será criado para você preencher os dados do detento."
             ),
-            color=discord.Color.dark_blue(),
+            color=ui.UI_COLOR_MAIN,
         )
         await interaction.channel.send(embed=embed, view=PrisaoView(self.bot))
-        await interaction.response.send_message("Painel de registro de prisão enviado com sucesso!", ephemeral=True)
+        await interaction.response.send_message(embed=ui.build_success_embed("Painel de registro de prisão enviado com sucesso!"), ephemeral=True)
 
     # ------------------------------------------
     # Helpers internos
@@ -311,9 +312,9 @@ class RegistroPrisao(commands.Cog):
             # ==========================================
             # MONTAGEM DO EMBED
             # ==========================================
-            embed = discord.Embed(
+            embed = ui.build_embed(
                 title="📚 Registro de Prisão",
-                color=discord.Color.dark_orange(),
+                color=ui.UI_COLOR_WARNING,
             )
             embed.add_field(name="QRA dos Oficiais da Penal",    value=qra_oficiais,            inline=False)
             embed.add_field(name="Passaporte dos Oficiais",      value=pass_oficiais,           inline=False)
@@ -332,7 +333,7 @@ class RegistroPrisao(commands.Cog):
             embed.add_field(name="Houve Fiança?",                value=fianca_txt,              inline=True)
             embed.add_field(name="Valor da Fiança",              value=valor_fianca_txt,        inline=True)
 
-            embed.set_footer(text=f"Prisão registrada em: {datetime.now().strftime('%d/%m/%Y às %H:%M')}")
+            embed.set_footer(text=f"{ui.FOOTER_TEXT} • Prisão registrada em: {datetime.now().strftime('%d/%m/%Y às %H:%M')}")
             embed.set_author(name=f"Registrado por: {user.display_name}")
 
             # ---- Primeira imagem como thumbnail no embed (via attachment local) ----

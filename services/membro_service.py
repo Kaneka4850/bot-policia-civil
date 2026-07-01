@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine, Column, Integer, String, Boolean
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-DATABASE_URL = "sqlite:///oficiais-policia-civil.db"
+DATABASE_URL = "sqlite:///oficiais-fbi.db"
 
 Base = declarative_base()
 engine = create_engine(DATABASE_URL, echo=False, future=True)
@@ -16,6 +16,33 @@ class Membro(Base):
     usuario = Column(String, nullable=False)
     discord_id = Column(Integer, unique=True, nullable=False)
     aprovado = Column(Boolean, default=False)
+
+class Advertencia(Base):
+    __tablename__ = "advertencias"
+    id = Column(Integer, primary_key=True, index=True)
+    membro_id = Column(Integer, nullable=False)
+    tipo = Column(String, nullable=False)
+    duracao_dias = Column(Integer, nullable=True)
+    motivo = Column(String, nullable=False)
+    aplicador_id = Column(Integer, nullable=False)
+
+class Prisao(Base):
+    __tablename__ = "prisoes"
+    id = Column(Integer, primary_key=True, index=True)
+    qra_primaria = Column(String, nullable=False)
+    qra_oficiais = Column(String, nullable=False)
+    passaporte_oficiais = Column(String, nullable=False)
+    passaporte_primaria = Column(String, nullable=False)
+    nome_preso = Column(String, nullable=False)
+    passaporte_preso = Column(String, nullable=False)
+    artigos = Column(String, nullable=False)
+    meses = Column(Integer, nullable=False)
+    multa = Column(Boolean, default=False)
+    valor_multa = Column(String, nullable=True)
+    advogado = Column(String, nullable=True)
+    passaporte_advogado = Column(String, nullable=True)
+    fianca = Column(Boolean, default=False)
+    valor_fianca = Column(String, nullable=True)
 
 Base.metadata.create_all(bind=engine)
 

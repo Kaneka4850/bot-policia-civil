@@ -13,12 +13,20 @@ Comandos expostos:
 
 from __future__ import annotations
 
+import asyncio
 import json
+import logging
 import re
 import sqlite3
 import unicodedata
+from collections import OrderedDict
 from pathlib import Path
 from typing import Optional
+
+logger = logging.getLogger("bot.status_acao")
+
+# Tamanho máximo do cache de mensagens já processadas
+_MAX_CACHE_SIZE = 2000
 
 import discord
 from discord.ext import commands
@@ -235,7 +243,7 @@ def _build_embed_global(bot: commands.Bot) -> discord.Embed:
         wr = round((w / total) * 100)
         embed.add_field(
             name=f"• {acao}",
-            value=f"🟢 {w}  🔴 {l}  |  {total} ação(ões)  |  WR: **{wr}%**",
+            value=f"🟢 {w}  🔴 {derrotas}  |  {total} ação(ões)  |  WR: **{wr}%**",
             inline=False,
         )
 
@@ -383,7 +391,8 @@ class StatusAcaoCog(commands.Cog):
         self.bot = bot
         _init_db()
         _load_json()
-        self._mensagens_processadas: set[str] = set()
+        # Cache limitado — evita crescimento infinito de memória
+        self._mensagens_processadas: OrderedDict[str, None] = OrderedDict()
         self._status_message_id: Optional[int] = None
 
     # ------------------------------------------------------------------
@@ -412,6 +421,15 @@ class StatusAcaoCog(commands.Cog):
         )
         return novos > 0
 
+    def _cache_add(self, mid: str) -> None:
+        """Adiciona ID ao cache limitado, removendo o mais antigo se necessário."""
+        if mid in self._mensagens_processadas:
+            return
+        self._mensagens_processadas[mid] = None
+        # Evita crescimento infinito — remove os mais antigos
+        while len(self._mensagens_processadas) > _MAX_CACHE_SIZE:
+            self._mensagens_processadas.popitem(last=False)
+
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message) -> None:
         if message.author != self.bot.user:
@@ -419,16 +437,25 @@ class StatusAcaoCog(commands.Cog):
         mid = str(message.id)
         if mid in self._mensagens_processadas:
             return
-        self._mensagens_processadas.add(mid)
-        if self._sincronizar_embed(message):
-            await self._atualizar_embed_global()
+        self._cache_add(mid)
+        try:
+            # Executa I/O de SQLite em thread separada para não bloquear o event loop
+            sync_result = await asyncio.to_thread(self._sincronizar_embed, message)
+            if sync_result:
+                await self._atualizar_embed_global()
+        except Exception:
+            logger.error("Erro ao sincronizar embed em on_message", exc_info=True)
 
     @commands.Cog.listener()
     async def on_message_edit(self, before: discord.Message, after: discord.Message) -> None:
         if after.author != self.bot.user:
             return
-        if self._sincronizar_embed(after):
-            await self._atualizar_embed_global()
+        try:
+            sync_result = await asyncio.to_thread(self._sincronizar_embed, after)
+            if sync_result:
+                await self._atualizar_embed_global()
+        except Exception:
+            logger.error("Erro ao sincronizar embed em on_message_edit", exc_info=True)
 
     # ------------------------------------------------------------------
     # EMBED GLOBAL PERSISTENTE
@@ -462,7 +489,7 @@ class StatusAcaoCog(commands.Cog):
     @app_commands.command(name="status_acao", description="Exibe estatísticas globais de ações por tipo.")
     async def status_acao(self, interaction: discord.Interaction) -> None:
         """Exibe estatísticas globais de ações por tipo."""
-        embed = _build_embed_global(self.bot)
+        embed = await asyncio.to_thread(_build_embed_global, self.bot)
         await interaction.response.send_message(embed=embed)
 
     # ------------------------------------------------------------------
@@ -476,7 +503,10 @@ class StatusAcaoCog(commands.Cog):
         membro: Optional[discord.Member] = None,
     ) -> None:
         """Sem menção → top-15 | Com menção → ficha individual."""
-        embed = _build_embed_top15(self.bot) if membro is None else _build_embed_membro(self.bot, membro)
+        if membro is None:
+            embed = await asyncio.to_thread(_build_embed_top15, self.bot)
+        else:
+            embed = await asyncio.to_thread(_build_embed_membro, self.bot, membro)
         await interaction.response.send_message(embed=embed)
 
     # ------------------------------------------------------------------
@@ -517,8 +547,11 @@ class StatusAcaoCog(commands.Cog):
         async for message in interaction.channel.history(limit=limite):
             if message.author != self.bot.user:
                 continue
-            if self._sincronizar_embed(message):
-                total_novos += 1
+            try:
+                if await asyncio.to_thread(self._sincronizar_embed, message):
+                    total_novos += 1
+            except Exception:
+                logger.error(f"Erro ao sincronizar msg {message.id}", exc_info=True)
 
         await interaction.edit_original_response(
             content=None,

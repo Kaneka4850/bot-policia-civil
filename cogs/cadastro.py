@@ -1,6 +1,8 @@
 import discord
 from discord.ext import commands
 from discord import app_commands
+import asyncio
+import logging
 import re
 
 # 🧩 Serviços e utilitários
@@ -11,9 +13,11 @@ from services.membro_service import (
     remover_registro,
     buscar_registro_por_discord_id
 )
-from utils.logger import log_event
+from utils.logger import log_event_async
 from utils.permissao import is_admin
 import utils.ui as ui
+
+logger = logging.getLogger("bot.cadastro")
 
 # 🔧 IDs e configuração
 Cargos_aprovadores = [1519099990587473925] # Lista de cargos que podem recrutar
@@ -56,15 +60,15 @@ class AprovacaoView(discord.ui.View):
         if not await self.verificar_permissao(interaction): return
         
         user_id = self.extrair_id_usuario(interaction)
-        registro = buscar_registro_por_discord_id(user_id)
+        registro = await asyncio.to_thread(buscar_registro_por_discord_id, user_id)
         
         if not registro:
             return await interaction.response.send_message(embed=ui.build_error_embed("Registro não encontrado no banco de dados. Talvez já tenha sido processado."), ephemeral=True)
         if registro.get("aprovado", False):
             return await interaction.response.send_message(embed=ui.build_warn_embed("Este registro já foi aprovado."), ephemeral=True)
 
-        aprovar_registro(user_id)
-        log_event(str(interaction.user), "Aprovou registro", registro["usuario"])
+        await asyncio.to_thread(aprovar_registro, user_id)
+        await log_event_async(str(interaction.user), "Aprovou registro", registro["usuario"])
 
         membro = interaction.guild.get_member(user_id)
         cargo = interaction.guild.get_role(Cargo_membro)
@@ -111,11 +115,11 @@ class AprovacaoView(discord.ui.View):
         if not await self.verificar_permissao(interaction): return
         
         user_id = self.extrair_id_usuario(interaction)
-        registro = buscar_registro_por_discord_id(user_id)
+        registro = await asyncio.to_thread(buscar_registro_por_discord_id, user_id)
         
         if registro:
-            remover_registro(user_id)
-            log_event(str(interaction.user), "Recusou registro", registro["usuario"])
+            await asyncio.to_thread(remover_registro, user_id)
+            await log_event_async(str(interaction.user), "Recusou registro", registro["usuario"])
 
         embed_atualizado = interaction.message.embeds[0]
         embed_atualizado.color = ui.UI_COLOR_ERROR
@@ -148,7 +152,7 @@ class RegistroModal(discord.ui.Modal, title="Registre seus dados"):
         if not re.fullmatch(r"\d{3}(-\d{3})?", telefone_fmt):      
             return await interaction.response.send_message(embed=ui.build_error_embed("Formato inválido! Use 000-000 ou 000."), ephemeral=True)
 
-        if buscar_registro_por_discord_id(interaction.user.id):
+        if await asyncio.to_thread(buscar_registro_por_discord_id, interaction.user.id):
             return await interaction.response.send_message(embed=ui.build_error_embed("Você já tem um registro em andamento/aprovado."), ephemeral=True)
 
         registro = {
@@ -159,7 +163,7 @@ class RegistroModal(discord.ui.Modal, title="Registre seus dados"):
             "discord_id": interaction.user.id,
             "aprovado": False
         }
-        adicionar_registro(registro)
+        await asyncio.to_thread(adicionar_registro, registro)
 
         # Confirmação efêmera para o usuário
         await interaction.response.send_message(
@@ -217,13 +221,13 @@ class DemitirModal(discord.ui.Modal, title="Digite o ID discord do membro"):
         except ValueError:
             return await interaction.response.send_message(embed=ui.build_error_embed("ID inválido."), ephemeral=True)
 
-        usr = buscar_registro_por_discord_id(did)
+        usr = await asyncio.to_thread(buscar_registro_por_discord_id, did)
         if not usr:
             return await interaction.response.send_message(embed=ui.build_error_embed(f"Usuário com ID `{did}` não registrado."), ephemeral=True)
 
         async def confirma(inter: discord.Interaction):
-            remover_registro(did)
-            log_event(str(inter.user), "Demitido", usr['usuario'])
+            remover_registro_result = await asyncio.to_thread(remover_registro, did)
+            await log_event_async(str(inter.user), "Demitido", usr['usuario'])
 
             membro = inter.guild.get_member(did)
             cargo = inter.guild.get_role(Cargo_membro)
@@ -282,7 +286,7 @@ class Cadastro(commands.Cog):
     @app_commands.command(name="listar_registros", description="Lista todos os registros aprovados")
     @app_commands.default_permissions(administrator=True)
     async def listar_registros(self, interaction: discord.Interaction):
-        registros_aprovados = listar_registros_aprovados()
+        registros_aprovados = await asyncio.to_thread(listar_registros_aprovados)
         if not registros_aprovados:
             await interaction.response.send_message(embed=ui.build_warn_embed("Nenhum registro aprovado encontrado."), ephemeral=True)
             return

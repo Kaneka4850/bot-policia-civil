@@ -3,9 +3,12 @@ from discord.ext import commands
 from discord import app_commands
 import asyncio
 import io
+import logging
 import aiohttp
 from datetime import datetime
 import utils.ui as ui
+
+logger = logging.getLogger("bot.registro_prisao")
 
 # ==========================================
 # VARIÁVEIS DE CONFIGURAÇÃO
@@ -102,7 +105,20 @@ class PrisaoView(discord.ui.View):
 
         cog: RegistroPrisao | None = self.bot.get_cog("RegistroPrisao")
         if cog:
-            asyncio.create_task(cog.executar_formulario(canal_temporario, membro))
+            task = asyncio.create_task(
+                cog.executar_formulario(canal_temporario, membro),
+                name=f"formulario-prisao-{membro.id}"
+            )
+            # Armazena referência para evitar garbage collection
+            cog._formulario_tasks.add(task)
+            task.add_done_callback(cog._formulario_tasks.discard)
+            # Callback para capturar exceções silenciosas
+            def _on_task_done(t: asyncio.Task):
+                if t.cancelled():
+                    logger.warning(f"Task formulário cancelada: {t.get_name()}")
+                elif t.exception():
+                    logger.error(f"Exceção em task formulário {t.get_name()}: {t.exception()}", exc_info=t.exception())
+            task.add_done_callback(_on_task_done)
 
 
 # ==========================================
@@ -111,6 +127,8 @@ class PrisaoView(discord.ui.View):
 class RegistroPrisao(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        # Armazena referências das tasks para evitar garbage collection prematura
+        self._formulario_tasks: set[asyncio.Task] = set()
 
     # ------------------------------------------
     # Comando de setup (somente admin)
@@ -368,7 +386,7 @@ class RegistroPrisao(commands.Cog):
             await fechar_canal("✅ Prisão registrada com sucesso! Este canal será fechado em 5 segundos...")
 
         except Exception as e:
-            print(f"[RegistroPrisao] Erro inesperado: {e}")
+            logger.error(f"[RegistroPrisao] Erro inesperado no formulário: {e}", exc_info=True)
             await fechar_canal("🚨 Ocorreu um erro interno. O canal será fechado...")
 
 

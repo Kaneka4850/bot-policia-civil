@@ -2,3 +2,4 @@ discord.py
 python-dotenv
 sqlalchemy
 aiohttp
+chat-exporter

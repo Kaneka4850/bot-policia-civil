@@ -9,3 +9,16 @@ services:
       - .:/app
     environment:
       - TZ=America/Sao_Paulo
+      # Desabilita buffering do Python para logs aparecerem imediatamente
+      - PYTHONUNBUFFERED=1
+    # ── Limites de memória ──────────────────────────
+    # Evita que o kernel OOM killer mate o processo sem aviso
+    mem_limit: 512m
+    memswap_limit: 512m
+    # ── Logging ────────────────────────────────────
+    # Limita o tamanho dos logs do Docker para evitar consumo de disco
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

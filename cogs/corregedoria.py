@@ -14,16 +14,19 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 import datetime
+import logging
 
 import utils.ui as ui
+
+logger = logging.getLogger("bot.corregedoria")
 
 # ─────────────────────────────────────────────
 # CONFIGURAÇÃO — Altere os IDs aqui
 # ─────────────────────────────────────────────
 
-LOG_CHANNEL_ID       = 1404103397195518053   # Canal de logs
+LOG_CHANNEL_ID       = 1519099991266955301   # Canal de logs
 TICKET_CATEGORY_ID   = 1519099992755671141   # Categoria onde os tickets são criados
-CORREGEDORIA_ROLE_ID = 1470812693484142796   # Cargo de Corregedoria (preencha)
+CORREGEDORIA_ROLE_ID = 1519099990608187596   # Cargo de Corregedoria (preencha)
 
 # ─────────────────────────────────────────────
 # HELPER: Verificação de permissão de staff
@@ -85,8 +88,10 @@ async def gerar_e_enviar_transcript(bot, canal, criador: discord.Member):
         import chat_exporter
         import io
 
-        transcript = await chat_exporter.export(canal)
+        # LIMITE: exporta no máximo 500 mensagens para evitar picos de memória
+        transcript = await chat_exporter.export(canal, limit=500)
         if not transcript:
+            logger.warning(f"Transcript vazio para canal {canal.name}")
             return
 
         arquivo = discord.File(
@@ -107,7 +112,7 @@ async def gerar_e_enviar_transcript(bot, canal, criador: discord.Member):
                 await criador.send(embed=embed_transcript, file=arquivo)
                 enviado_dm = True
         except discord.Forbidden:
-            pass
+            logger.info(f"DM fechada para {criador} — transcript será enviado ao canal de logs.")
 
         if not enviado_dm:
             canal_logs = bot.get_channel(LOG_CHANNEL_ID)
@@ -123,12 +128,18 @@ async def gerar_e_enviar_transcript(bot, canal, criador: discord.Member):
                 )
                 await canal_logs.send(embed=embed_log, file=arquivo_log)
 
+        # Libera a referência do transcript imediatamente para aliviar memória
+        del transcript
+
     except ImportError:
+        logger.warning("`chat_exporter` não está instalado.")
         canal_logs = bot.get_channel(LOG_CHANNEL_ID)
         if canal_logs:
             await canal_logs.send(
                 "⚠️ `chat_exporter` não está instalado. Instale com `pip install chat-exporter` para habilitar transcrição de tickets."
             )
+    except Exception as e:
+        logger.error(f"Erro ao gerar transcript para {canal.name}: {e}", exc_info=True)
 
 # ─────────────────────────────────────────────
 # MODAL: Encerramento de ticket
@@ -162,22 +173,28 @@ class ModalFecharTicket(discord.ui.Modal, title="🔒 Encerramento de Ticket"):
     )
 
     async def on_submit(self, interaction: discord.Interaction):
-        await interaction.response.send_message(embed=ui.build_embed("⏳ **Processando...** Gerando transcript e encerrando o ticket.", color=ui.UI_COLOR_WARNING), ephemeral=True)
+        await interaction.response.defer(ephemeral=True, thinking=True)
 
-        await gerar_e_enviar_transcript(self.bot, interaction.channel, self.criador)
+        try:
+            await gerar_e_enviar_transcript(self.bot, interaction.channel, self.criador)
 
-        await gerar_log(
-            self.bot,
-            interaction.user,
-            "Encerramento de Ticket",
-            moderador=interaction.user.name,
-            extras={
-                "Motivo":         str(self.motivo.value).strip(),
-                "Veredito":       str(self.veredito.value).strip(),
-                "Houve Punição":  str(self.punicao.value).strip() if self.punicao.value else "Não informado"
-            }
-        )
-        await interaction.channel.delete()
+            await gerar_log(
+                self.bot,
+                interaction.user,
+                "Encerramento de Ticket",
+                moderador=interaction.user.name,
+                extras={
+                    "Motivo":         str(self.motivo.value).strip(),
+                    "Veredito":       str(self.veredito.value).strip(),
+                    "Houve Punição":  str(self.punicao.value).strip() if self.punicao.value else "Não informado"
+                }
+            )
+            await interaction.channel.delete()
+        except Exception as e:
+            await interaction.followup.send(
+                embed=ui.build_error_embed(f"Ocorreu um erro ao encerrar o ticket: `{e}`"),
+                ephemeral=True
+            )
 
 # ─────────────────────────────────────────────
 # MODAL: Pokar membro
@@ -525,18 +542,6 @@ class Corregedoria(commands.Cog):
         self.bot.add_view(SetupView(self.bot))
         self.bot.add_view(CategoriaView(self.bot))
         self.bot.add_view(TicketView(self.bot, autor=None))
-
-    @app_commands.command(name="corregedoria", description="[Legado] Envia o painel antigo de abertura de tickets.")
-    @app_commands.default_permissions(administrator=True)
-    async def corregedoria_cmd(self, interaction: discord.Interaction):
-        embed = ui.build_embed(
-            title="⚖️ | Central da Corregedoria (Legado)",
-            description="Para iniciar um atendimento, por favor selecione a categoria desejada no menu abaixo.",
-            color=ui.UI_COLOR_MAIN
-        )
-        embed.set_footer(text=f"{ui.FOOTER_TEXT} • Sistema de Tickets • Corregedoria")
-        await interaction.channel.send(embed=embed, view=CategoriaView(self.bot))
-        await interaction.response.send_message(embed=ui.build_success_embed("Painel legado de corregedoria enviado!"), ephemeral=True)
 
     @app_commands.command(name="setup_corregedoria", description="Envia o painel de atendimento (tickets) da corregedoria.")
     @app_commands.default_permissions(administrator=True)

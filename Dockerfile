@@ -13,5 +13,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copiar o resto do código do bot para o container
 COPY . .
 
+# Evita buffering do Python — logs aparecem imediatamente no Docker
+ENV PYTHONUNBUFFERED=1
+
 # Comando para rodar o bot
 CMD ["python", "main.py"]

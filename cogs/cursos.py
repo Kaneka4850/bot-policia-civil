@@ -113,6 +113,7 @@ class AgendarCursoModal(ui.Modal, title="Agendar Curso"):
         # ── embed de aviso ──
         embed = uiu.build_embed(
             title=f"📋 Curso: {self.nome_curso.value.strip()}",
+            description="",
             color=uiu.UI_COLOR_INFO,
         )
         if bot_avatar:
@@ -121,7 +122,7 @@ class AgendarCursoModal(ui.Modal, title="Agendar Curso"):
         embed.add_field(name="Curso",     value=f"@ ┊ {self.nome_curso.value.strip()}", inline=False)
         embed.add_field(name="Instrutor", value=interaction.user.mention,               inline=False)
         embed.add_field(name="Data",      value=self.data.value.strip(),                inline=True)
-        embed.add_field(name="Hora",      value=f"{hora_fmt}h",                         inline=True)
+        embed.add_field(name="Hora",      value=hora_fmt,                               inline=True)
         embed.add_field(name="Local",     value=self.local.value.strip(),               inline=False)
         embed.add_field(
             name="\u200b",
@@ -161,7 +162,7 @@ class AvisoCursoView(ui.View):
         self.nome_curso    = nome_curso
         self.message_id    = None
 
-    @ui.button(label="Solicitar Curso", style=discord.ButtonStyle.primary, emoji="📩", custom_id="solicitar_curso")
+    @ui.button(label="Solicitar Curso", style=discord.ButtonStyle.primary, emoji="📩", custom_id="aviso_solicitar_curso")
     async def solicitar_curso(self, interaction: discord.Interaction, button: ui.Button):
         canal_pendentes = interaction.guild.get_channel(CURSOS_PENDENTES)
         if canal_pendentes is None:
@@ -212,7 +213,7 @@ class AvaliacaoView(ui.View):
     def _somente_criador(self, interaction: discord.Interaction) -> bool:
         return interaction.user.id == self.criador_id
 
-    @ui.button(label="Aprovar", style=discord.ButtonStyle.success, emoji="✅", custom_id="aprovar_curso")
+    @ui.button(label="Aprovar", style=discord.ButtonStyle.success, emoji="✅", custom_id="avaliacao_aprovar_curso")
     async def aprovar(self, interaction: discord.Interaction, button: ui.Button):
         if not self._somente_criador(interaction):
             await interaction.response.send_message(
@@ -220,11 +221,14 @@ class AvaliacaoView(ui.View):
             )
             return
 
+        # ── deferir imediatamente para evitar timeout de 3s do Discord ──
+        await interaction.response.defer(ephemeral=True)
+
         cargo = interaction.guild.get_role(self.cargo_curso_id)
         aluno = interaction.guild.get_member(self.aluno_id)
 
         if aluno is None:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 embed=uiu.build_error_embed("Aluno não encontrado no servidor."), ephemeral=True
             )
             return
@@ -248,18 +252,21 @@ class AvaliacaoView(ui.View):
         embed.add_field(name="Status", value="🟢 Aprovado", inline=False)
 
         await interaction.message.edit(embed=embed, view=self)
-        await interaction.response.send_message(
+        await interaction.followup.send(
             embed=uiu.build_success_embed(f"{aluno.mention} aprovado(a) e cargo **{cargo.name if cargo else self.cargo_curso_id}** concedido."),
             ephemeral=True,
         )
 
-    @ui.button(label="Reprovar", style=discord.ButtonStyle.danger, emoji="❌", custom_id="reprovar_curso")
+    @ui.button(label="Reprovar", style=discord.ButtonStyle.danger, emoji="❌", custom_id="avaliacao_reprovar_curso")
     async def reprovar(self, interaction: discord.Interaction, button: ui.Button):
         if not self._somente_criador(interaction):
             await interaction.response.send_message(
                 embed=uiu.build_error_embed("Apenas o instrutor que criou o curso pode aprovar/reprovar."), ephemeral=True
             )
             return
+
+        # ── deferir imediatamente para evitar timeout de 3s do Discord ──
+        await interaction.response.defer(ephemeral=True)
 
         aluno = interaction.guild.get_member(self.aluno_id)
 
@@ -289,7 +296,7 @@ class AvaliacaoView(ui.View):
         embed.add_field(name="Status", value="🔴 Reprovado", inline=False)
 
         await interaction.message.edit(embed=embed, view=self)
-        await interaction.response.send_message(
+        await interaction.followup.send(
             embed=uiu.build_success_embed(f"{aluno.mention if aluno else self.aluno_id} reprovado(a). DM enviada."), ephemeral=True
         )
 
@@ -334,11 +341,15 @@ class SetupCursos(commands.Cog):
 
     async def cog_load(self):
         self.bot.add_view(SetupCursosView())
+        self.bot.add_view(AvisoCursoView(criador_id=0, cargo_curso_id=0, nome_curso=""))
+        self.bot.add_view(AvaliacaoView(criador_id=0, aluno_id=0, cargo_curso_id=0, nome_curso=""))
 
     @app_commands.command(name="setup_cursos", description="Posta o embed persistente de agendamento de cursos.")
     @app_commands.default_permissions(administrator=True)
     async def setup_cursos(self, interaction: discord.Interaction):
         """Posta o embed persistente de agendamento de cursos."""
+        await interaction.response.defer(ephemeral=True)
+
         bot_user   = interaction.client.user
         bot_avatar = bot_user.display_avatar.url if bot_user else None
 
@@ -356,7 +367,7 @@ class SetupCursos(commands.Cog):
         embed.set_footer(text=f"{uiu.FOOTER_TEXT} • Apenas instrutores e administradores podem agendar cursos.")
 
         await interaction.channel.send(embed=embed, view=SetupCursosView())
-        await interaction.response.send_message(embed=uiu.build_success_embed("Painel de cursos enviado com sucesso!"), ephemeral=True)
+        await interaction.followup.send(embed=uiu.build_success_embed("Painel de cursos enviado com sucesso!"), ephemeral=True)
 
 
 async def setup(bot: commands.Bot):

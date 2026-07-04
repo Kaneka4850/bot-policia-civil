@@ -5,7 +5,7 @@ from sqlalchemy.orm import declarative_base
 DATABASE_URL = "sqlite:///database-fbi.db" 
 
 # 2. O motor que faz a conexão
-engine = create_engine(DATABASE_URL, echo=True)
+engine = create_engine(DATABASE_URL, echo=False)
 
 # 3. A Base que seus modelos (Membro, Prisao) usam
 Base = declarative_base()

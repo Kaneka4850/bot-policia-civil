@@ -332,6 +332,7 @@ class RegistroPrisao(commands.Cog):
             # ==========================================
             embed = ui.build_embed(
                 title="📚 Registro de Prisão",
+                description="Detalhes do registro de prisão",
                 color=ui.UI_COLOR_WARNING,
             )
             embed.add_field(name="QRA dos Oficiais da Penal",    value=qra_oficiais,            inline=False)

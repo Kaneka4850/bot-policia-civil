@@ -207,54 +207,6 @@ class RegistroView(discord.ui.View):
         await interaction.response.send_modal(RegistroModal(self.bot))
 
 
-# ❌ Modal de Demissão (Mantido quase igual, não precisa ser persistente)
-class DemitirModal(discord.ui.Modal, title="Digite o ID discord do membro"):
-    discord_id = discord.ui.TextInput(label="ID do Discord", placeholder="123456789012345678", max_length=18)
-
-    def __init__(self, bot):
-        super().__init__()
-        self.bot = bot
-
-    async def on_submit(self, interaction: discord.Interaction):
-        try:
-            did = int(self.discord_id.value)
-        except ValueError:
-            return await interaction.response.send_message(embed=ui.build_error_embed("ID inválido."), ephemeral=True)
-
-        usr = await asyncio.to_thread(buscar_registro_por_discord_id, did)
-        if not usr:
-            return await interaction.response.send_message(embed=ui.build_error_embed(f"Usuário com ID `{did}` não registrado."), ephemeral=True)
-
-        async def confirma(inter: discord.Interaction):
-            remover_registro_result = await asyncio.to_thread(remover_registro, did)
-            await log_event_async(str(inter.user), "Demitido", usr['usuario'])
-
-            membro = inter.guild.get_member(did)
-            cargo = inter.guild.get_role(Cargo_membro)
-            if membro and cargo:
-                await membro.remove_roles(cargo, reason="Demitido")
-
-            await inter.response.send_message(embed=ui.build_success_embed(f"{usr['usuario']} demitido."), ephemeral=True)
-
-            embed_demissao = ui.build_embed(
-                title="❌ Registro Removido",
-                description=(
-                    f"👤 {usr['usuario']}\n"
-                    f"📛 Nome: {usr['nome']}\n"
-                    f"🆔 Passaporte: {usr['id']}\n"
-                    f"🆔 Discord ID: {did}\n"
-                    f"👮 Removido por: {inter.user.mention}"
-                ),
-                color=ui.UI_COLOR_ERROR
-            )
-            await enviar_log(inter.guild, embed=embed_demissao)
-
-        view = discord.ui.View()
-        botao = discord.ui.Button(label="Confirmar", style=discord.ButtonStyle.danger)
-        botao.callback = confirma
-        view.add_item(botao)
-        await interaction.response.send_message(f"⚠️ Confirma a demissão de {usr['usuario']}?", view=view, ephemeral=True)
-
 
 # 🔧 Comandos principais
 class Cadastro(commands.Cog):
@@ -308,17 +260,7 @@ class Cadastro(commands.Cog):
                 )
             await interaction.followup.send(embed=embed)
 
-    @app_commands.command(name="demitir", description="Demitir um oficial do FBI")
-    @app_commands.default_permissions(administrator=True)
-    async def demitir(self, interaction: discord.Interaction):
-        view = discord.ui.View()
-        async def abrir_modal(inter: discord.Interaction):
-            await inter.response.send_modal(DemitirModal(self.bot))
 
-        botao = discord.ui.Button(label="Demitir", style=discord.ButtonStyle.danger)
-        botao.callback = abrir_modal
-        view.add_item(botao)
-        await interaction.response.send_message("Clique para exonerar o oficial do FBI", view=view, ephemeral=True)
 
 
 async def setup(bot):

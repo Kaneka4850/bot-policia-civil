@@ -22,7 +22,7 @@ EMOJI_TICKET = "🎟️"
 # ==========================================
 # Configurações Globais
 # ==========================================
-FOOTER_TEXT = "FBI — Feito por Kaneka愛"
+FOOTER_TEXT = "FBI | Miami City"
 
 def build_embed(title: str, description: str, color: int = UI_COLOR_MAIN) -> discord.Embed:
     """Cria um embed padrão do sistema com o rodapé e a cor configurados."""

@@ -178,6 +178,7 @@ bot = MyBot(command_prefix="!", intents=intents)
 
 COGS = [
     "cogs.cadastro",
+    "cogs.demitir",
     "cogs.alinhamento",
     "cogs.advertencia",
     "cogs.corregedoria",
@@ -201,7 +202,7 @@ async def comandos(interaction: discord.Interaction):
     embed.add_field(name="/listar_registros",        value="Lista todos os registros aprovados.", inline=False)
     embed.add_field(name="/setup_ausencia",          value="Comando para criar o menu de ausência (apenas administradores).", inline=False)
     embed.add_field(name="/setup_cursos",            value="Comando para criar o menu de cursos (apenas administradores).", inline=False)
-    embed.add_field(name="/demitir",                 value="Demitir um agente (apenas admins).", inline=False)
+    embed.add_field(name="/setup_demissao",            value="(Apenas Administradores) Cria o painel de exoneração.", inline=False)
     embed.add_field(name="/convocar",                value="Convoca um membro para uma reunião.", inline=False)
     embed.add_field(name="/advertir",                value="Aplica uma advertência a um membro.", inline=False)
     embed.add_field(name="/prisao",                  value="Registra uma prisão.", inline=False)
